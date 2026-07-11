@@ -28,7 +28,7 @@ from domain.rom_files import (
     synthetic_rom_name,
 )
 from domain.rom_install import RomInstall
-from domain.shortcut_data import EmulatorInvocation, build_launch_options, resolve_emulator_invocation
+from domain.shortcut_data import EmulatorInvocation, build_launch_options
 from lib.errors import error_response
 from lib.list_result import ErrorCode
 from lib.path_safety import PathTraversalError, coerce_safe_component, safe_join
@@ -44,6 +44,7 @@ if TYPE_CHECKING:
         DiscResolver,
         DownloadFileStore,
         EventEmitter,
+        LaunchResolverFn,
         RetroDeckPaths,
         RommRomReader,
         RomRemoverProvider,
@@ -112,6 +113,7 @@ class DownloadServiceConfig:
     # construction cycle, so the composition root binds it after both exist
     # (#1298 sibling supersede).
     rom_remover: RomRemoverProvider
+    launch_resolver: LaunchResolverFn
 
 
 class DownloadService:
@@ -132,6 +134,7 @@ class DownloadService:
         self._m3u_support = config.m3u_support
         self._uow_factory = config.uow_factory
         self._rom_remover = config.rom_remover
+        self._launch_resolver = config.launch_resolver
 
         # Owned state
         self._download_in_progress: set[int] = set()
@@ -836,6 +839,7 @@ class DownloadService:
         app_id, emulator, bake_path = await self._loop.run_in_executor(
             None, self._resolve_bound_app_id, rom_id, final_path
         )
+        resolution = self._launch_resolver.resolve_for(rom_detail, emulator, rom_detail.get("platform_slug"))
         await self._emit(
             "download_complete",
             {
@@ -844,7 +848,7 @@ class DownloadService:
                 "platform_name": platform_name,
                 "file_path": final_path,
                 "app_id": app_id,
-                "launch_options": build_launch_options(resolve_emulator_invocation(rom_detail, emulator), bake_path),
+                "launch_options": build_launch_options(resolution.launch_options, bake_path),
                 "resumable": entry.get("resumable", False),
             },
         )

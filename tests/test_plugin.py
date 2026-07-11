@@ -1,3 +1,4 @@
+from tests.fakes.fake_launch_resolver import FakeLaunchResolver
 import asyncio
 import json
 import os
@@ -70,6 +71,7 @@ def plugin():
             uow_factory=FakeUnitOfWorkFactory(),
             active_core=FakeActiveCoreResolver(default=(None, None)),
             disc_resolver=FakeDiscResolver(),
+            launch_resolver=FakeLaunchResolver(),
         ),
     )
 
@@ -1013,6 +1015,7 @@ class TestMainStartupOrdering:
                 log_debug=MagicMock(),
                 plugin_metadata=MagicMock(),
                 uow_factory=MagicMock(),
+                launch_resolver=MagicMock(),
             ),
             runtime_adapters=RuntimeAdaptersBundle(
                 clock=MagicMock(),

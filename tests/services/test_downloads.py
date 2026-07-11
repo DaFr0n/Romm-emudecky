@@ -1,3 +1,4 @@
+from tests.fakes.fake_launch_resolver import FakeLaunchResolver
 import asyncio
 import os
 import sqlite3
@@ -159,6 +160,7 @@ def plugin():
             uow_factory=FakeUnitOfWorkFactory(),
             active_core=p._active_core,
             disc_resolver=FakeDiscResolver(),
+            launch_resolver=FakeLaunchResolver(),
         ),
     )
     p._download_service = DownloadService(
@@ -177,6 +179,7 @@ def plugin():
             ),
             active_core=p._active_core,
             disc_resolver=FakeDiscResolver(),
+            launch_resolver=FakeLaunchResolver(),
             # Default-True so the existing M3U/launch-file tests are unaffected;
             # a test that exercises a non-m3u platform repoints this seam.
             m3u_support=lambda system_name: p._m3u_supported,

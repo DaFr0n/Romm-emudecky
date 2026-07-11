@@ -99,7 +99,7 @@ already-installed copy of the game is never removed, so cancelling a re-download
 leaves your existing install intact. If the cancel happens to land just as the download finishes, the game is kept as
 **Installed** rather than torn down.
 
-Downloaded ROMs are stored in your RetroDECK roms directory (e.g. `~/retrodeck/roms/gba/`).
+Downloaded ROMs are stored in your EmuDeck ROMs directory (e.g. `<storagePath>/Emulation/roms/gba/`).
 
 **Only one version of a game is downloaded at a time.** If you tap **Download** on a version while another version of
 the same game (its [sibling group](#versions)) is already on disk, the plugin removes the old install first and then
@@ -194,7 +194,7 @@ The selected disc is **saved**, and it survives the things that would otherwise 
 - **A library re-sync** never changes your pick.
 - **Uninstalling and re-downloading** the game restores it — the choice is remembered against the game, not the
   downloaded files, so a reinstall re-applies it automatically.
-- A **RetroDECK path migration** (moving your RetroDECK home) keeps it too.
+- An **EmuDeck path migration** (moving your EmuDeck home) keeps it too.
 
 If the specific disc you pinned ever goes missing (for example a partial re-download), the game quietly falls back to
 the default disc rather than failing to launch.
@@ -206,9 +206,9 @@ The disc you pick applies to **the Steam shortcut this plugin created for the ga
 yourself (for example a hand-made Xenia or standalone-emulator shortcut) — those carry their own launch command, which
 the plugin doesn't manage.
 
-!!! note "RetroDECK is the supported launcher"
+!!! note "EmuDeck is the supported launcher"
 
-    The disc picker launches through RetroDECK, the supported launcher today. PS1 and the other `.m3u` disc-swapping
+    The disc picker launches through EmuDeck, the supported launcher today. PS1 and the other `.m3u` disc-swapping
     systems are fully covered; systems that need an external standalone emulator to run at all are a separate roadmap
     item.
 
@@ -268,8 +268,8 @@ everything already in flight, so a batch of downloads won't overcommit the SD ca
 Select any installed game in the Steam Library and press **Play**. The full launch command is baked into the Steam
 shortcut when the game is synced or downloaded, so launching just runs that command:
 
-1. The shortcut launches RetroDECK with the correct ROM path
-2. RetroDECK auto-detects the system from the ROM's directory path and uses the appropriate emulator
+1. The shortcut launches EmuDeck with the correct ROM path
+2. EmuDeck auto-detects the system from the ROM's directory path and uses the appropriate emulator
 3. If you picked a [per-game core](bios-management.md#per-game-game-detail-page), the chosen core is baked into the
    command and used directly
 4. For a multi-disc game, the [disc you picked](#picking-a-disc-for-multi-disc-games) is the one that launches

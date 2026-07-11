@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from domain.disc_selection import default_descriptor
-from domain.shortcut_data import build_launch_options, resolve_emulator_invocation
+from domain.shortcut_data import build_launch_options
 from lib.list_result import ErrorCode
 
 if TYPE_CHECKING:
@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from services.protocols import (
         ActiveCoreReader,
         DiscResolver,
+        LaunchResolverFn,
         UnitOfWorkFactory,
     )
 
@@ -54,6 +55,7 @@ class DiscServiceConfig:
     uow_factory: UnitOfWorkFactory
     disc_resolver: DiscResolver
     active_core: ActiveCoreReader
+    launch_resolver: LaunchResolverFn
 
 
 class DiscService:
@@ -65,6 +67,7 @@ class DiscService:
         self._uow_factory = config.uow_factory
         self._disc_resolver = config.disc_resolver
         self._active_core = config.active_core
+        self._launch_resolver = config.launch_resolver
 
     async def get_disc_selection(self, rom_id: int) -> dict[str, Any]:
         """Report the disc picker's state for ``rom_id``.
@@ -159,11 +162,11 @@ class DiscService:
                 rom.pin_selected_disc(filename)
             uow.roms.set_selected_disc(rom_id, rom.selected_disc)
             selected = rom.selected_disc
-        launch_options = self._bake_launch_options(rom_id, install, discs, selected)
+        launch_options = self._bake_launch_options(rom_id, install, discs, selected, rom.platform_slug)
         return {"success": True, "launch_options": launch_options, "selected": selected}
 
     def _bake_launch_options(
-        self, rom_id: int, install: RomInstall, discs: list[Disc], selected_disc: str | None
+        self, rom_id: int, install: RomInstall, discs: list[Disc], selected_disc: str | None, platform_slug: str | None = None
     ) -> str:
         """Bake the launch command for the now-selected disc + the ROM's active core.
 
@@ -176,4 +179,5 @@ class DiscService:
         """
         bake_path = self._disc_resolver.resolve_bake_path(install, discs, selected_disc)
         emulator = self._active_core.active_emulator_for_rom(rom_id)
-        return build_launch_options(resolve_emulator_invocation({"id": rom_id}, emulator), bake_path)
+        resolution = self._launch_resolver.resolve_for({"id": rom_id}, emulator, platform_slug)
+        return build_launch_options(resolution.launch_options, bake_path)

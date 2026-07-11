@@ -19,6 +19,8 @@ from adapters.asyncio_sleeper import AsyncioSleeper
 from adapters.cover_art_file_store import CoverArtFileStoreAdapter
 from adapters.debug_logger import SettingsAwareDebugLogger
 from adapters.download_file import DownloadFileAdapter
+from adapters.emudeck_launchers import EmuDeckLauncherAdapter
+from adapters.emudeck_paths import EmuDeckPathsAdapter
 from adapters.es_de_config import CoreResolver
 from adapters.firmware_file import FirmwareFileAdapter
 from adapters.hostname import HostnameAdapter
@@ -34,7 +36,6 @@ from adapters.plugin_metadata import PluginMetadataAdapter
 from adapters.repositories.unit_of_work import SqliteUnitOfWork
 from adapters.retroarch_config import RetroArchConfigAdapter
 from adapters.retroarch_core_info import RetroArchCoreInfoAdapter
-from adapters.emudeck_paths import EmuDeckPathsAdapter
 from adapters.rom_files import RomFileAdapter
 from adapters.romm.http import RommHttpAdapter
 from adapters.romm.romm_api import RommApiAdapter
@@ -89,6 +90,7 @@ if TYPE_CHECKING:
         FirmwareFileStore,
         HostnameReader,
         InstalledRomRemoverFn,
+        LaunchResolverFn,
         MachineIdReader,
         MigrationFileStore,
         PathExistsReader,
@@ -171,6 +173,7 @@ class CallbackBundle:
     log_debug: DebugLogger
     plugin_metadata: PluginMetadataReader
     uow_factory: UnitOfWorkFactory
+    launch_resolver: LaunchResolverFn
 
 
 @dataclass(frozen=True)
@@ -304,6 +307,19 @@ def bootstrap(
         logger=logger,
         user_home=user_home,
     )
+    # EmuDeck launch resolver (EmuDeck port plan §7 invariant: a single
+    # shared launch resolver for every shortcut ``launch_options`` bake).
+    # RetroArch cores dir is sourced from EmuDeck's separate RetroArch
+    # flatpak install (``~/.var/app/org.libretro.RetroArch/config/retroarch/cores``)
+    # — empty string here leaves the libretro branch in ``needs_setup``
+    # until the per-EmuDeck-retroarch-adapter (post-MVP) resolves the
+    # actual path. The launcher map ships empty per plan §6 hard rule
+    # (no guessed launcher names).
+    launch_resolver = EmuDeckLauncherAdapter(
+        paths=retrodeck_paths,
+        retroarch_cores_dir="",
+        logger=logger,
+    )
 
     # SystemClock is dependency-free; construct it here so the single shared
     # instance threads into PersistenceAdapter (corrupt-settings backup stamp)
@@ -384,6 +400,7 @@ def bootstrap(
         log_debug=debug_logger,
         plugin_metadata=plugin_metadata,
         uow_factory=uow_factory,
+        launch_resolver=launch_resolver,
     )
     runtime_adapters = RuntimeAdaptersBundle(
         clock=clock,
@@ -483,6 +500,7 @@ def wire_services(cfg: WiringConfig) -> dict[str, Any]:
             uow_factory=cfg.callbacks.uow_factory,
             active_core=active_core_resolver,
             disc_resolver=disc_launch_resolver,
+            launch_resolver=cfg.callbacks.launch_resolver,
         ),
     )
 
@@ -599,6 +617,7 @@ def wire_services(cfg: WiringConfig) -> dict[str, Any]:
             uow_factory=cfg.callbacks.uow_factory,
             active_core=active_core_resolver,
             disc_resolver=disc_launch_resolver,
+            launch_resolver=cfg.callbacks.launch_resolver,
         ),
     )
     pending_sync_binding.set(lambda: sync_service.pending_sync)
@@ -619,6 +638,7 @@ def wire_services(cfg: WiringConfig) -> dict[str, Any]:
             m3u_support=cfg.callbacks.m3u_support,
             uow_factory=cfg.callbacks.uow_factory,
             rom_remover=rom_remover_binding.get,
+            launch_resolver=cfg.callbacks.launch_resolver,
         ),
     )
 
@@ -717,6 +737,7 @@ def wire_services(cfg: WiringConfig) -> dict[str, Any]:
             uow_factory=cfg.callbacks.uow_factory,
             active_core=active_core_resolver,
             disc_resolver=disc_launch_resolver,
+            launch_resolver=cfg.callbacks.launch_resolver,
         ),
     )
 
@@ -727,6 +748,7 @@ def wire_services(cfg: WiringConfig) -> dict[str, Any]:
             uow_factory=cfg.callbacks.uow_factory,
             disc_resolver=disc_launch_resolver,
             active_core=active_core_resolver,
+            launch_resolver=cfg.callbacks.launch_resolver,
         ),
     )
 

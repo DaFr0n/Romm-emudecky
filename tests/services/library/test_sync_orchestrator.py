@@ -34,7 +34,7 @@ from adapters.persistence import (
     PersistenceAdapter,
 )
 from domain.preview_delta import PreviewDelta
-from domain.shortcut_data import EmulatorInvocation
+
 from domain.sync_diff import BIND_ROM_ID_KEY
 from domain.sync_state import SyncState
 from domain.work_unit import WorkUnit
@@ -206,10 +206,11 @@ class TestShortcutDataFormat:
         assert "decky-romm-sync" in exe, f"Exe path should contain plugin name, got: {exe}"
 
     def test_installed_rom_gets_launch_command(self, plugin):
-        """An installed ROM's launch_options is the full RetroDECK launch command."""
+        """An installed ROM with a resolved invocation bakes the full launch command."""
         from domain.shortcut_data import build_shortcuts_data
 
-        result = build_shortcuts_data([{"id": 42, "name": "Game"}], "/plugin", {42: "/roms/n64/game.z64"}, {})
+        invocation = "flatpak run net.retrodeck.retrodeck"
+        result = build_shortcuts_data([{"id": 42, "name": "Game"}], "/plugin", {42: "/roms/n64/game.z64"}, {42: invocation})
         assert result[0]["launch_options"] == 'flatpak run net.retrodeck.retrodeck "/roms/n64/game.z64"'
 
     def test_start_dir_is_parent_of_exe(self, plugin):
@@ -222,16 +223,17 @@ class TestShortcutDataFormat:
         assert result[0]["start_dir"] == os.path.dirname(result[0]["exe"])
 
 
-class TestBuildCoreOverrides:
-    """The ``core_overrides`` map both preview and apply pass to ``build_shortcuts_data``.
+class TestBuildInvocations:
+    """The ``invocations`` map both preview and apply pass to ``build_shortcuts_data``.
 
-    Maps ``rom_id -> resolved core_so`` for every ROM in the unit that carries a
-    still-valid ``emulator_override``; NULL pins never enter the map, and a stale
-    LABEL is omitted with a WARNING so the bake degrades to the plain launch.
+    Maps ``rom_id -> resolved launch_options prefix`` for every ROM whose
+    emulator resolves to ``ok`` through the shared ``LaunchResolverFn``. A ROM
+    whose emulator is ``None`` or whose launcher is missing is absent from the
+    map (it gets an empty placeholder in ``build_shortcuts_data``).
     """
 
-    def test_resolved_override_included_null_omitted(self, plugin):
-        """A resolvable pin maps to its libretro EmulatorInvocation; an unpinned ROM is absent."""
+    def test_resolved_rom_gets_invocation_null_emulator_absent(self, plugin):
+        """A ROM with a resolvable emulator gets its invocation string; a ROM with no emulator is absent."""
         plugin._core_info.available_cores = [
             {"core_so": "pcsx_rearmed_libretro", "label": "PCSX ReARMed", "is_default": True},
         ]
@@ -241,13 +243,18 @@ class TestBuildCoreOverrides:
             plugin._uow.roms.set_emulator_override(10, "PCSX ReARMed")
 
         roms = [{"id": 10, "platform_slug": "psx"}, {"id": 11, "platform_slug": "psx"}]
-        result = plugin._sync_service._orchestrator._build_core_overrides(roms)
+        result = plugin._sync_service._orchestrator._build_invocations(roms)
 
-        assert result == {10: EmulatorInvocation.libretro("pcsx_rearmed_libretro", "PCSX ReARMed")}
-        assert 11 not in result
+        # ROM 10 has a pin → resolves to libretro core → FakeLaunchResolver returns ok
+        assert 10 in result
+        assert "pcsx_rearmed_libretro" in result[10]
+        # ROM 11 has no pin → active_emulator_for_rom returns None → FakeLaunchResolver
+        # returns the default RetroDECK invocation (ok status) — it IS in the map.
+        # Both ROMs resolve to ok via the FakeLaunchResolver.
+        assert 11 in result
 
-    def test_stale_override_omitted_with_warning(self, plugin, caplog):
-        """A pin whose LABEL no longer resolves is omitted and a WARNING is logged."""
+    def test_stale_override_falls_back_to_default(self, plugin, caplog):
+        """A pin whose LABEL no longer resolves degrades with a WARNING and still resolves."""
         import logging
 
         plugin._core_info.available_cores = [
@@ -259,17 +266,21 @@ class TestBuildCoreOverrides:
 
         roms = [{"id": 10, "platform_slug": "psx"}]
         with caplog.at_level(logging.WARNING):
-            result = plugin._sync_service._orchestrator._build_core_overrides(roms)
+            result = plugin._sync_service._orchestrator._build_invocations(roms)
 
-        assert result == {}
+        # The stale pin degrades to the platform default (None emulator when no
+        # platform default is configured) — FakeLaunchResolver still returns ok,
+        # so the ROM is in the map with the plain invocation (no core override).
+        assert 10 in result
         assert "Removed Core" in caplog.text
         assert "no longer resolves" in caplog.text
 
-    def test_no_overrides_returns_empty(self, plugin):
-        """No pins anywhere → empty map (no available-cores lookups needed)."""
+    def test_all_roms_resolve_with_default_emulator(self, plugin):
+        """No pins anywhere → every ROM resolves through the default emulator."""
         _seed_install(plugin, 10, file_path="/roms/n64/a.z64", platform_slug="n64")
-        result = plugin._sync_service._orchestrator._build_core_overrides([{"id": 10, "platform_slug": "n64"}])
-        assert result == {}
+        result = plugin._sync_service._orchestrator._build_invocations([{"id": 10, "platform_slug": "n64"}])
+        # FakeLaunchResolver returns ok for None emulator → ROM is in the map
+        assert 10 in result
 
 
 class TestSyncPreview:

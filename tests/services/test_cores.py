@@ -1,6 +1,7 @@
 """Tests for CoreService — per-platform core write + fan-out + per-game pin/clear + core menu."""
-
 from __future__ import annotations
+
+from tests.fakes.fake_launch_resolver import FakeLaunchResolver
 
 import asyncio
 import logging
@@ -190,6 +191,7 @@ def service(
             uow_factory=uow_factory,
             active_core=active_core,
             disc_resolver=disc_resolver,
+            launch_resolver=FakeLaunchResolver(),
         ),
     )
 

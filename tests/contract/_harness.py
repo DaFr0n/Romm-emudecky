@@ -49,6 +49,7 @@ from bootstrap import (
 from fakes.fake_romm_api import FakeRommApi
 from fakes.fake_steamgrid_db_api import FakeSteamGridDbApi
 from fakes.system_time import FakeClock, FakeSleeper, FakeUuidGen
+from tests.fakes.fake_launch_resolver import FakeLaunchResolver
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -175,6 +176,15 @@ def build_contract_harness(tmp_path: Any) -> ContractHarness:
     loop = asyncio.get_event_loop()
 
     # 3. Wire the real services with the patched bundle.
+    # Swap the launch resolver with a fake so the contract tests exercise the
+    # callable orchestration (the real EmuDeckLauncherAdapter can't resolve
+    # launchers on a non-EmuDeck host; the adapter has its own unit tests in
+    # tests/adapters/test_emudeck_launchers.py).
+    fake_launch_resolver = FakeLaunchResolver()
+    patched_callbacks = dataclasses.replace(
+        result.callbacks,
+        launch_resolver=fake_launch_resolver,
+    )
     cfg = WiringConfig(
         adapters=patched_adapters,
         stores=result.stores,
@@ -190,7 +200,7 @@ def build_contract_harness(tmp_path: Any) -> ContractHarness:
             hostname_provider=result.runtime_adapters.hostname_provider,
             machine_id_provider=result.runtime_adapters.machine_id_provider,
         ),
-        callbacks=result.callbacks,
+        callbacks=patched_callbacks,
         min_required_version=Plugin._MIN_REQUIRED_VERSION,
     )
     services = wire_services(cfg)

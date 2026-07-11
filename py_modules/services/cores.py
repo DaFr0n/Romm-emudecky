@@ -25,7 +25,6 @@ from domain.emulator_commands import label_to_invocation, options_to_payload
 from domain.shortcut_data import (
     EmulatorInvocation,
     build_launch_options,
-    resolve_emulator_invocation,
 )
 from lib.list_result import ErrorCode
 
@@ -40,6 +39,7 @@ if TYPE_CHECKING:
         BiosChecker,
         CoreInfoProvider,
         DiscResolver,
+        LaunchResolverFn,
         SettingsPersister,
         SystemResolver,
         UnitOfWorkFactory,
@@ -71,6 +71,7 @@ class CoreServiceConfig:
     uow_factory: UnitOfWorkFactory
     active_core: ActiveCoreReader
     disc_resolver: DiscResolver
+    launch_resolver: LaunchResolverFn
 
 
 class CoreService:
@@ -87,6 +88,7 @@ class CoreService:
         self._uow_factory = config.uow_factory
         self._active_core = config.active_core
         self._disc_resolver = config.disc_resolver
+        self._launch_resolver = config.launch_resolver
 
     async def get_platform_core_info(self, rom_id: int) -> dict[str, Any]:
         """Return the emulators available for ``rom_id``'s platform + the active one.
@@ -182,7 +184,12 @@ class CoreService:
         rebake_items: list[dict[str, Any]] = []
         for rom, install in pending:
             emulator = self._active_core.active_emulator_for_rom(rom.rom_id)
-            invocation = resolve_emulator_invocation({}, emulator)
+            resolution = self._launch_resolver.resolve_for(
+                {"id": rom.rom_id, "platform_slug": rom.platform_slug},
+                emulator,
+                rom.platform_slug,
+            )
+            invocation = resolution.launch_options
             # Fold the ROM's persisted disc pick over the install so a
             # per-platform core change re-bakes the pinned disc, not disc 1 /
             # the m3u. A single-disc ROM resolves to its own file_path.
@@ -337,7 +344,12 @@ class CoreService:
         app_id = rom.shortcut_app_id
         if app_id is None or install is None:
             return (None, None)
-        invocation = resolve_emulator_invocation({}, emulator)
+        resolution = self._launch_resolver.resolve_for(
+            {"id": rom.rom_id, "platform_slug": rom.platform_slug},
+            emulator,
+            rom.platform_slug,
+        )
+        invocation = resolution.launch_options
         # Fold the ROM's persisted disc pick over the install so a per-game core
         # pin/clear re-bakes the pinned disc, not disc 1 / the m3u. A single-disc
         # ROM resolves to its own file_path.

@@ -1,3 +1,4 @@
+from tests.fakes.fake_launch_resolver import FakeLaunchResolver
 import asyncio
 import logging
 from datetime import UTC, datetime
@@ -73,6 +74,7 @@ def plugin(tmp_path):
             uow_factory=FakeUnitOfWorkFactory(uow=uow),
             active_core=FakeActiveCoreResolver(default=(None, None)),
             disc_resolver=FakeDiscResolver(),
+            launch_resolver=FakeLaunchResolver(),
         ),
     )
     decky.DECKY_USER_HOME = str(tmp_path)

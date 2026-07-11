@@ -5,7 +5,7 @@
 decky-romm-sync is a [Decky Loader](https://decky.xyz/) plugin that connects your self-hosted
 [RomM](https://github.com/rommapp/romm) ROM library to Steam. Every game in your RomM library appears as a Non-Steam
 shortcut in the Steam Library, complete with cover art, metadata, and collections. Games launch through
-[RetroDECK](https://retrodeck.net/).
+[EmuDeck](https://emudeck.com/).
 
 ## Prerequisites
 
@@ -16,8 +16,8 @@ Before installing the plugin, you need:
    only the token — your password is never saved. Each user should have their own RomM account (see
    [Save Sync](save-sync.md) for why this matters).
 
-2. **RetroDECK** — installed on your Steam Deck or Linux PC. RetroDECK handles the actual emulation. The plugin creates
-   shortcuts that launch games through RetroDECK.
+2. **EmuDeck** — installed on your Steam Deck or Linux PC. EmuDeck handles the actual emulation. The plugin creates
+   shortcuts that launch games through EmuDeck.
 
 3. **Decky Loader** — the plugin framework. Install it from [decky.xyz](https://decky.xyz/) if you haven't already.
    Decky renders inside Steam's gamepad UI, and the plugin works wherever that UI runs: Gaming Mode on the Steam Deck,

@@ -1,6 +1,9 @@
 """Pure functions for building shortcut data dicts and launch commands.
 
-No I/O, no imports from services, adapters, or lib.
+No I/O, no imports from services, adapters, or lib. Launch-invocation
+resolution (the host-specific prefix before the ROM path) is the caller's
+responsibility — this module receives pre-resolved invocation strings and
+combines them with the ROM path via :func:`build_launch_options`.
 """
 
 from __future__ import annotations
@@ -12,51 +15,27 @@ from typing import Any
 
 from domain.sibling_group import compute_sibling_group_key
 
-# RetroDECK's flatpak application id. Its plain ``flatpak run <app>`` form is the
-# emulator invocation prefix the launch command wraps the resolved ROM path with;
-# the folder-boot ``direct`` form threads a ``--command=<launcher>`` between the
-# ``flatpak run`` verb and the app id (see :func:`resolve_emulator_invocation`).
-_RETRODECK_APP_ID = "net.retrodeck.retrodeck"
-RETRODECK_INVOCATION = f"flatpak run {_RETRODECK_APP_ID}"
-
 # The leading ``%EMULATOR_<NAME>%`` binary token and the trailing ``%ROM%`` target
 # of an ES-DE ``<command>`` — stripped from a standalone command to recover the
 # middle launcher args (e.g. ``--no-gui``) for the folder-boot ``direct`` bake.
 _EMULATOR_TOKEN_RE = re.compile(r"%EMULATOR_[A-Z0-9_-]+%")
 
-# RetroArch cores dir as seen INSIDE the RetroDECK flatpak sandbox. Baked
-# literally into the -e override; %EMULATOR_RETROARCH% and %ROM% stay as ES-DE
-# placeholders (run_game.sh resolves and quotes them at launch).
-_RETROARCH_CORES_DIR = "/var/config/retroarch/cores"
-
 
 @dataclass(frozen=True)
 class EmulatorInvocation:
-    """What a ROM launches with — a libretro core, a standalone emulator, or a direct sandbox launch.
+    """What a ROM launches with — a libretro core, a standalone emulator, or a direct launch.
 
-    The plugin resolves one of these per ROM and bakes it into the shortcut's
-    ``launch_options`` via :func:`resolve_emulator_invocation`. The payload
-    carried depends on ``kind``:
+    The plugin resolves one of these per ROM and passes it to the host-specific
+    launch resolver (the ``LaunchResolverFn`` seam) which turns it into a
+    launch-options prefix. The payload carried depends on ``kind``:
 
     - ``kind == "libretro"`` → ``core_so`` is the BARE core name (no ``.so``); the
-      renderer emits the RetroArch ``-L <coresdir>/<so>.so %ROM%`` form (the cores
-      dir is baked literally because RetroDECK does not expand ``%CORE_RETROARCH%``
-      through ``-e``).
+      resolver emits the RetroArch ``-L <coresdir>/<so>.so %ROM%`` form.
     - ``kind == "standalone"`` → ``command`` is the full ES-DE ``<command>`` text
-      (already ending in ``%ROM%``, e.g. ``%EMULATOR_RPCS3% --no-gui %ROM%``),
-      baked verbatim into ``-e``. RetroDECK's ``run_game.sh`` resolves
-      ``%EMULATOR_*%`` and substitutes ``%ROM%`` with the trailing rom path.
+      (already ending in ``%ROM%``).
     - ``kind == "direct"`` → the folder-boot form (ADR-0019): ``command`` is the
       same full ES-DE standalone command AND ``launcher`` is the emulator's
-      sandbox launcher path (e.g.
-      ``/app/retrodeck/components/rpcs3/component_launcher.sh``). The renderer
-      emits ``flatpak run --command=<launcher> <app> <args>`` — running the
-      emulator launcher directly INSIDE the sandbox, bypassing ``run_game.sh``,
-      because ``run_game.sh`` reinterprets any directory ``%ROM%`` as an ES-DE
-      "directory as a file" and can never launch a bare game folder. The ``<args>``
-      are the standalone command's middle (``%EMULATOR_*%`` and ``%ROM%``
-      stripped, e.g. ``--no-gui``); the game folder is appended by
-      :func:`build_launch_options`.
+      sandbox launcher path.
 
     ``label`` is the ES-DE display label (diagnostics only). This is the
     standalone-emulator seam (#129); read-path consumers that only understand
@@ -86,46 +65,14 @@ class EmulatorInvocation:
 
         *command* is the full ES-DE standalone ``<command>`` (its middle args are
         recovered at render time); *launcher* is the emulator's sandbox launcher
-        path handed to ``flatpak run --command=``.
+        path.
         """
         return cls(kind="direct", label=label, command=command, launcher=launcher)
 
 
-def resolve_emulator_invocation(rom: dict[str, Any], emulator: EmulatorInvocation | None = None) -> str:
-    """Return the emulator invocation prefix for *rom*.
-
-    With *emulator* unset (``None``) the ROM follows the plain RetroDECK flatpak
-    command (the single genuine fallback for a platform with no resolvable
-    emulator). A **libretro** invocation renders the RetroDECK ``-e`` override that
-    forces that RetroArch core:
-    ``flatpak run … -e "%EMULATOR_RETROARCH% -L <cores>/<so>.so %ROM%"`` (cores dir
-    literal; ``%EMULATOR_RETROARCH%`` / ``%ROM%`` stay ES-DE placeholders). A
-    **standalone** invocation bakes the emulator's full ES-DE command verbatim:
-    ``flatpak run … -e "<command … %ROM%>"`` (e.g. ``%EMULATOR_RPCS3% --no-gui
-    %ROM%``) — RetroDECK resolves ``%EMULATOR_*%`` and substitutes ``%ROM%`` at
-    launch. *rom* is the per-emulator-branch seam and is ignored today.
-    """
-    del rom  # reserved for the future per-emulator branch
-    # Branch explicitly so a half-resolved invocation never reaches the f-string
-    # (no "None.so" / empty -e); anything unrenderable degrades to the plain launch.
-    if emulator is None:
-        return RETRODECK_INVOCATION
-    if emulator.kind == "direct" and emulator.launcher and emulator.command:
-        # Run the emulator's sandbox launcher directly, bypassing run_game.sh's
-        # directory-as-a-file reinterpretation (ADR-0019). The game folder is
-        # appended by build_launch_options; only the middle args ride here.
-        args = _direct_launch_args(emulator.command)
-        base = f"flatpak run --command={emulator.launcher} {_RETRODECK_APP_ID}"
-        return f"{base} {args}" if args else base
-    if emulator.kind == "standalone" and emulator.command:
-        return f'{RETRODECK_INVOCATION} -e "{emulator.command}"'
-    if emulator.kind == "libretro" and emulator.core_so:
-        # The bare core name + ".so" forms the on-disk RetroArch core path -L expects.
-        return f'{RETRODECK_INVOCATION} -e "%EMULATOR_RETROARCH% -L {_RETROARCH_CORES_DIR}/{emulator.core_so}.so %ROM%"'
-    return RETRODECK_INVOCATION
 
 
-def _direct_launch_args(command: str) -> str:
+def direct_launch_args(command: str) -> str:
     """Recover a standalone command's middle launcher args for the ``direct`` bake.
 
     Strips the leading ``%EMULATOR_<NAME>%`` binary token(s) and the ``%ROM%``
@@ -180,7 +127,7 @@ def build_shortcuts_data(
     roms: list[dict[str, Any]],
     plugin_dir: str,
     installed_paths: dict[int, str],
-    core_overrides: dict[int, EmulatorInvocation],
+    invocations: dict[int, str],
 ) -> list[dict[str, Any]]:
     """Transform ROM list into shortcut data dicts for frontend AddShortcut calls.
 
@@ -188,14 +135,13 @@ def build_shortcuts_data(
     installed ROM gets a full launch command in ``launch_options``; a ROM absent
     from the map gets ``""`` (empty placeholder) until it is downloaded.
 
-    *core_overrides* maps ``rom_id`` to the **already-resolved**
-    :class:`EmulatorInvocation` the ROM launches with (its full active emulator —
-    libretro core or standalone — folding the per-game/per-platform override over
-    the es_systems default). Only ROMs that resolved to an emulator appear (the
-    caller omits the ``(None, None)`` fallback); a ROM absent from the map follows
-    the plain RetroDECK launch, a present ROM bakes its ``-e`` form into
-    ``launch_options``. Required so a new bake site can never silently skip the
-    override.
+    *invocations* maps ``rom_id`` to the **pre-resolved** launch-invocation prefix
+    string (the host-specific command before the ROM path, e.g. the EmuDeck
+    launcher script path + args). Only ROMs whose emulator resolved successfully
+    appear in the map (the caller pre-resolves each installed ROM through the
+    shared ``LaunchResolverFn`` seam); a ROM absent from the map gets an empty
+    ``launch_options`` — the launcher was not resolved (``needs_setup`` /
+    ``launcher_missing``), not a silent RetroDECK fallback.
 
     The sibling-group key (ADR-0021) and RomM's version dimensions (``regions`` /
     ``languages`` / ``revision`` / ``tags`` / ``is_main_sibling``) are derived
@@ -219,7 +165,7 @@ def build_shortcuts_data(
             "start_dir": start_dir,
             "launch_options": (
                 build_launch_options(
-                    resolve_emulator_invocation(rom, core_overrides.get(rom["id"])),
+                    invocations.get(rom["id"], ""),
                     installed_paths[rom["id"]],
                 )
                 if rom["id"] in installed_paths

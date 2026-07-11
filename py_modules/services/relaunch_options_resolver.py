@@ -28,7 +28,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from domain.shortcut_data import build_launch_options, resolve_emulator_invocation
+from domain.shortcut_data import build_launch_options
 
 if TYPE_CHECKING:
     from domain.rom import Rom
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from services.protocols import (
         ActiveCoreReader,
         DiscResolver,
+        LaunchResolverFn,
         UnitOfWorkFactory,
     )
 
@@ -54,6 +55,7 @@ class RelaunchOptionsResolverConfig:
     uow_factory: UnitOfWorkFactory
     active_core: ActiveCoreReader
     disc_resolver: DiscResolver
+    launch_resolver: LaunchResolverFn
 
 
 class RelaunchOptionsResolver:
@@ -63,6 +65,7 @@ class RelaunchOptionsResolver:
         self._uow_factory = config.uow_factory
         self._active_core = config.active_core
         self._disc_resolver = config.disc_resolver
+        self._launch_resolver = config.launch_resolver
 
     def _resolve_item(self, rom: Rom, install: RomInstall) -> dict[str, Any]:
         """Compose one ``{app_id, launch_options}`` item for an installed+bound ROM.
@@ -76,7 +79,12 @@ class RelaunchOptionsResolver:
         ``file_path``.
         """
         emulator = self._active_core.active_emulator_for_rom(rom.rom_id)
-        invocation = resolve_emulator_invocation({"id": rom.rom_id}, emulator)
+        resolution = self._launch_resolver.resolve_for(
+            {"id": rom.rom_id, "platform_slug": rom.platform_slug},
+            emulator,
+            rom.platform_slug,
+        )
+        invocation = resolution.launch_options
         bake_path = self._disc_resolver.resolve_for_install(install, rom.selected_disc)
         return {
             "app_id": rom.shortcut_app_id,

@@ -49,7 +49,7 @@ the plugin.
 ## Supported Systems
 
 Save sync currently supports **RetroArch per-game `.srm` saves only**. This covers all systems that use RetroArch cores
-through RetroDECK:
+through EmuDeck:
 
 - NES, SNES, Game Boy, Game Boy Color, Game Boy Advance
 - Genesis / Mega Drive, Master System, Nintendo 64
@@ -127,7 +127,7 @@ The warning shows which core you're switching from and to. You can:
 - **Cancel** — go back and switch the core back before launching
 
 A per-game core applies for any ROM filename — the plugin bakes the chosen core into the game's launch command rather
-than relying on RetroDECK's gamelist lookup. See [Changing the Active Core](bios-management.md#changing-the-active-core)
+than relying on EmuDeck's gamelist lookup. See [Changing the Active Core](bios-management.md#changing-the-active-core)
 for how per-game and per-platform cores work.
 
 ### Which cores are compatible?
@@ -198,18 +198,18 @@ Steam also tracks playtime natively for non-Steam shortcuts, so you'll see playt
 
 ## Save File Location
 
-Save files are stored in your RetroDECK saves directory. The exact path is read from RetroDECK's configuration at
-runtime — typically:
+Save files are stored in your EmuDeck saves directory. The exact path is determined by EmuDeck's storage
+configuration — typically:
 
-- **Internal SSD**: `~/retrodeck/saves/{system}/{rom_name}.srm`
-- **SD card**: `/run/media/deck/Emulation/retrodeck/saves/{system}/{rom_name}.srm`
+- **Internal SSD**: `<storagePath>/Emulation/saves/{system}/{rom_name}.srm`
+- **SD card**: `/run/media/deck/Emulation/saves/{system}/{rom_name}.srm`
 
 ## RetroArch Save Sorting Requirement
 
-Save sync expects save files to be organized as `{saves_dir}/{system}/{rom_name}.srm`. This matches the **RetroDECK
-default** RetroArch configuration:
+Save sync expects save files to be organized as `{saves_dir}/{system}/{rom_name}.srm`. This matches **EmuDeck's
+RetroArch** configuration:
 
-| RetroArch Setting                            | Required Value | RetroDECK Default |
+| RetroArch Setting                            | Required Value | EmuDeck Default   |
 | -------------------------------------------- | -------------- | ----------------- |
 | Sort Saves into Folders by Content Directory | **ON**         | ON                |
 | Sort Saves into Folders by Core Name         | **OFF**        | OFF               |
@@ -233,7 +233,7 @@ the core (e.g., `mGBA`, `duckstation`, `Mesen`). The plugin does not search thes
 
 ### How to check your settings
 
-In RetroArch: **Settings > Saving**. Look for the two "Sort Saves into Folders" toggles. On a fresh RetroDECK install,
+In RetroArch: **Settings > Saving**. Look for the two "Sort Saves into Folders" toggles. On a fresh EmuDeck install,
 they are already set correctly.
 
 ### If your saves are already in core-name folders
@@ -260,4 +260,4 @@ see the [Save File Sync Architecture](../architecture/save-file-sync-architectur
 
 ---
 
-**Previous:** [RetroDECK Path Migration](retrodeck-path-migration.md) | **Next:** [Troubleshooting](troubleshooting.md)
+**Previous:** [EmuDeck Path Migration](retrodeck-path-migration.md) | **Next:** [Troubleshooting](troubleshooting.md)

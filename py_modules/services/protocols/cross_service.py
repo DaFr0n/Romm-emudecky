@@ -17,9 +17,31 @@ if TYPE_CHECKING:
     from models.sync import ClientSaveState
 
     from domain.disc_selection import Disc
+    from domain.emudeck_launch import EmuDeckLaunchResolution
     from domain.rom_install import RomInstall
     from domain.save_layout import SaveLayout
     from domain.shortcut_data import EmulatorInvocation
+
+
+class LaunchResolverFn(Protocol):
+    """Resolve a ROM's host launch command on EmuDeck (cross-service seam).
+
+    The single shared launch resolver the EmuDeck port plan §7 mandates:
+    every service that bakes a shortcut's ``launch_options`` (sync
+    orchestrator, downloads, version switch, cores, disc) calls this
+    Protocol. The production implementation is
+    :class:`adapters.emudeck_launchers.EmuDeckLauncherAdapter`; tests use
+    fakes. Returns a structured :class:`EmuDeckLaunchResolution` so
+    callers can surface ``needs_setup`` / ``launcher_missing`` state to
+    the UI rather than silently emitting an empty launch_options string.
+    """
+
+    def resolve_for(
+        self,
+        rom: dict[str, Any],
+        emulator: EmulatorInvocation | None,
+        system: str | None,
+    ) -> EmuDeckLaunchResolution: ...
 
 
 class RetryStrategy(Protocol):

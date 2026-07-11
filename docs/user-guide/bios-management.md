@@ -59,7 +59,7 @@ if your RomM server has BIOS files for them.
 
 <!-- Screenshot: System page showing per-platform Emulator Core button above BIOS download counts -->
 
-BIOS files are downloaded to your RetroDECK bios directory (e.g. `~/retrodeck/bios/`). Some platforms use subdirectories
+BIOS files are downloaded to your EmuDeck BIOS directory (e.g. `<storagePath>/Emulation/bios/`). Some platforms use subdirectories
 — for example, Dreamcast BIOS goes into `bios/dc/` and PS2 BIOS goes into `bios/pcsx2/bios/`. The plugin handles the
 correct placement automatically.
 
@@ -74,7 +74,7 @@ deletion is local, the button works even when your RomM server is offline.
 3. Confirm the action in the dialog that appears
 
 This is a destructive action, so a confirmation dialog asks you to confirm before anything is deleted. Once confirmed,
-the plugin removes every downloaded BIOS file for that system from your RetroDECK bios directory and reports the result.
+the plugin removes every downloaded BIOS file for that system from your EmuDeck BIOS directory and reports the result.
 Games that need those files won't launch until you download them again with **Download All** or **Download Required**.
 
 The same per-platform delete is also available from the **Data Management** page (under per-platform actions) for
@@ -95,12 +95,12 @@ systems. This filtering is built into the BIOS registry and works automatically.
 ## Active Core Detection
 
 Different emulator cores can have different BIOS requirements for the same platform. The plugin detects which core
-RetroDECK is actually configured to use and filters the BIOS list accordingly, so you only see the files that matter for
+EmuDeck is actually configured to use and filters the BIOS list accordingly, so you only see the files that matter for
 your setup.
 
 ### Example: Game Boy Advance
 
-- With **mGBA** (RetroDECK's default), `gba_bios.bin` is shown as _optional_ — mGBA has a built-in high-level BIOS
+- With **mGBA** (EmuDeck's default), `gba_bios.bin` is shown as _optional_ — mGBA has a built-in high-level BIOS
   replacement
 - With **gpSP**, `gba_bios.bin` is shown as _required_ — gpSP cannot run without it
 
@@ -113,7 +113,7 @@ you at a glance which core the plugin is filtering for.
    itself — see [Per-Game (Game Detail Page)](#per-game-game-detail-page) below.)
 2. If no per-game core, the plugin checks for a **per-platform core** you set on the System page — stored by the plugin
    in its own settings, not in ES-DE.
-3. The plugin reads RetroDECK's ES-DE configuration (`es_systems.xml`) from the flatpak installation to find the default
+3. The plugin reads EmuDeck's ES-DE configuration (`es_systems.xml`) from the EmuDeck installation to find the default
    emulator for each platform — for BIOS filtering it uses the platform's first RetroArch core. This live file is the
    only source; there is no bundled fallback snapshot.
 4. If a platform's default is a **standalone emulator** (no RetroArch core) or the live configuration can't be read, all
@@ -122,7 +122,7 @@ you at a glance which core the plugin is filtering for.
 Whatever this chain resolves to is the **same core the game launches on** — the plugin bakes the resolved core into the
 Steam shortcut, so the core shown for BIOS, saves, and the core badge always matches the core that runs.
 
-The detection chain ensures BIOS filtering works even when RetroDECK's configuration files aren't accessible (e.g. after
+The detection chain ensures BIOS filtering works even when EmuDeck's configuration files aren't accessible (e.g. after
 an update changes paths). You'll see a "Core: mGBA" badge when detection is working, or no badge when falling back to
 showing all files.
 
@@ -151,7 +151,7 @@ menu.
 3. Press the **Emulator Core** button and pick an emulator from the menu
 4. The BIOS file list below updates immediately to show files relevant to the new choice
 
-If RetroDECK can't be found (no `es_systems.xml`), the menu shows "Emulator list unavailable — RetroDECK installation
+If EmuDeck can't be found (no `es_systems.xml`), the menu shows "Emulator list unavailable — EmuDeck installation
 not found" instead of a list.
 
 The plugin stores the choice in its own settings and **immediately re-applies it** to every installed game on that
@@ -159,12 +159,12 @@ platform — the change takes effect right away, with no sync needed (games that
 own choice). The System page works even when your RomM server is offline — core switching and BIOS status are available,
 only download buttons are disabled.
 
-!!! note "A RetroDECK default-core change needs a Force Full Sync"
+!!! note "An EmuDeck default-core change needs a Force Full Sync"
 
-    Setting a per-platform core on the System page re-bakes your installed games right away. But if a **RetroDECK
+    Setting a per-platform core on the System page re-bakes your installed games right away. But if an **EmuDeck
     update** ships a _new default core_ for a platform (and you have not picked a core yourself), that new default does
     **not** take effect on a normal sync — a normal sync skips platforms whose games haven't changed, so the
-    previously-baked core stays. Run a **Force Full Sync** to re-bake every game and pick up RetroDECK's new default.
+    previously-baked core stays. Run a **Force Full Sync** to re-bake every game and pick up EmuDeck's new default.
 
 ### Per-Game (Game Detail Page)
 
@@ -185,7 +185,7 @@ parentheses so you know what the game will fall back to.
 
 Each core in the list below can show up to three markers, one per role:
 
-- **(default)** — the RetroDECK/es_systems default core for this platform.
+- **(default)** — the EmuDeck/es_systems default core for this platform.
 - **(system)** — the per-platform core you picked on the [System page](#per-platform-system-page) (stored in the
   plugin's settings). Absent when the platform has no per-platform override.
 - **✓** (checkmark) — the core this game actually launches with right now.
@@ -210,7 +210,7 @@ see a "Core saved — restart Steam to apply" message — your choice is still s
 (or the next sync).
 
 Per-game cores work for **any ROM filename**. The plugin bakes the chosen core directly into the game's launch command,
-so it does not rely on RetroDECK's gamelist lookup (which mishandles parentheses and other special characters in
+so it does not rely on EmuDeck's gamelist lookup (which mishandles parentheses and other special characters in
 filenames) and is not affected by that upstream limitation.
 
 ### Core choices are not migrated from ES-DE
@@ -243,4 +243,4 @@ two-column layout.
 
 ---
 
-**Previous:** [Managing Games](managing-games.md) | **Next:** [RetroDECK Path Migration](retrodeck-path-migration.md)
+**Previous:** [Managing Games](managing-games.md) | **Next:** [EmuDeck Path Migration](retrodeck-path-migration.md)

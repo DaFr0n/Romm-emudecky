@@ -15,8 +15,9 @@ The migration relaunch path (``services.migration._build_relaunch_items``) and
 the startup reconcile both bake through the shared ``RelaunchOptionsResolver``;
 its disc-pin behavior is pinned in ``test_relaunch_options_resolver.py``.
 """
-
 from __future__ import annotations
+
+from tests.fakes.fake_launch_resolver import FakeLaunchResolver
 
 import asyncio
 import logging
@@ -110,6 +111,7 @@ class TestSyncOrchestratorBakeSite:
                 artwork=MagicMock(),
                 active_core=FakeActiveCoreResolver(default=(None, None)),
                 disc_resolver=disc_resolver,
+                launch_resolver=FakeLaunchResolver(),
             )
         )
 
@@ -153,6 +155,7 @@ class TestDownloadsBakeSite:
                 retrodeck_paths=MagicMock(),
                 active_core=FakeActiveCoreResolver(default=(None, None)),
                 disc_resolver=disc_resolver,
+                launch_resolver=FakeLaunchResolver(),
                 m3u_support=lambda system_name: False,
                 uow_factory=uow_factory,
                 rom_remover=lambda: AsyncMock(),

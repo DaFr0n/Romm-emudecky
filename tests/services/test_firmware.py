@@ -1,3 +1,4 @@
+from tests.fakes.fake_launch_resolver import FakeLaunchResolver
 import asyncio
 import os
 from dataclasses import asdict
@@ -157,6 +158,7 @@ def plugin():
             uow_factory=FakeUnitOfWorkFactory(),
             active_core=FakeActiveCoreResolver(default=(None, None)),
             disc_resolver=FakeDiscResolver(),
+            launch_resolver=FakeLaunchResolver(),
         ),
     )
     return p

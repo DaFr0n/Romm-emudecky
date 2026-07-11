@@ -1,3 +1,4 @@
+from tests.fakes.fake_launch_resolver import FakeLaunchResolver
 import asyncio
 import json
 import os
@@ -118,6 +119,7 @@ def plugin(tmp_path, fake_romm_api):
             uow_factory=FakeUnitOfWorkFactory(),
             active_core=p._active_core,
             disc_resolver=FakeDiscResolver(),
+            launch_resolver=FakeLaunchResolver(),
         ),
     )
 
@@ -135,6 +137,7 @@ def plugin(tmp_path, fake_romm_api):
             uow_factory=FakeUnitOfWorkFactory(uow=uow),
             active_core=p._active_core,
             disc_resolver=FakeDiscResolver(),
+            launch_resolver=FakeLaunchResolver(),
         ),
     )
 
@@ -1053,7 +1056,7 @@ class TestMigrationRelaunchOptions:
         """Happy path: a relocated installed+bound ROM emits its app_id + NEW-path command."""
         import decky
 
-        from domain.shortcut_data import build_launch_options, resolve_emulator_invocation
+        from domain.shortcut_data import build_launch_options
 
         decky.DECKY_USER_HOME = str(tmp_path)
         plugin._persistence = PersistenceAdapter(str(tmp_path), str(tmp_path), decky.logger)
@@ -1077,7 +1080,7 @@ class TestMigrationRelaunchOptions:
 
         payload = self._relaunch_emit(plugin)
         assert payload is not None
-        expected_cmd = build_launch_options(resolve_emulator_invocation({"id": 1}), new_rom)
+        expected_cmd = build_launch_options("flatpak run net.retrodeck.retrodeck", new_rom)
         assert payload["items"] == [{"app_id": 4242, "launch_options": expected_cmd}]
         # The command must point at the NEW path, never the stale old one.
         assert new_rom in payload["items"][0]["launch_options"]
@@ -1227,7 +1230,7 @@ class TestMigrationRelaunchOptions:
         """Edge: mixed batch — only the installed+bound ROM appears in items."""
         import decky
 
-        from domain.shortcut_data import build_launch_options, resolve_emulator_invocation
+        from domain.shortcut_data import build_launch_options
 
         decky.DECKY_USER_HOME = str(tmp_path)
         plugin._persistence = PersistenceAdapter(str(tmp_path), str(tmp_path), decky.logger)
@@ -1259,7 +1262,7 @@ class TestMigrationRelaunchOptions:
 
         payload = self._relaunch_emit(plugin)
         assert payload is not None
-        expected_cmd = build_launch_options(resolve_emulator_invocation({"id": 1}), new_bound_rom)
+        expected_cmd = build_launch_options("flatpak run net.retrodeck.retrodeck", new_bound_rom)
         assert payload["items"] == [{"app_id": 1111, "launch_options": expected_cmd}]
 
     @pytest.mark.asyncio
@@ -1329,7 +1332,7 @@ class TestMigrationRelaunchOptions:
         """
         import decky
 
-        from domain.shortcut_data import build_launch_options, resolve_emulator_invocation
+        from domain.shortcut_data import build_launch_options
 
         decky.DECKY_USER_HOME = str(tmp_path)
         plugin._persistence = PersistenceAdapter(str(tmp_path), str(tmp_path), decky.logger)
@@ -1354,7 +1357,7 @@ class TestMigrationRelaunchOptions:
             persisted_path = uow.rom_installs.get(1).file_path
         payload = self._relaunch_emit(plugin)
         assert payload is not None
-        expected_cmd = build_launch_options(resolve_emulator_invocation({"id": 1}), persisted_path)
+        expected_cmd = build_launch_options("flatpak run net.retrodeck.retrodeck", persisted_path)
         assert payload["items"][0]["launch_options"] == expected_cmd
 
 
@@ -1931,7 +1934,7 @@ class TestChainedMigration:
         """Headline #1042 fix: rows+files at A after A→B→C reach C, both keys cleared."""
         import decky
 
-        from domain.shortcut_data import build_launch_options, resolve_emulator_invocation
+        from domain.shortcut_data import build_launch_options
 
         decky.DECKY_USER_HOME = str(tmp_path)
         plugin._persistence = PersistenceAdapter(str(tmp_path), str(tmp_path), decky.logger)
@@ -1962,7 +1965,7 @@ class TestChainedMigration:
         # Relaunch options rebaked at the NEW (C) path.
         payload = self._relaunch_emit(plugin)
         assert payload is not None
-        expected = build_launch_options(resolve_emulator_invocation({"id": 1}), new_rom)
+        expected = build_launch_options("flatpak run net.retrodeck.retrodeck", new_rom)
         assert payload["items"] == [{"app_id": 4242, "launch_options": expected}]
 
     @pytest.mark.asyncio

@@ -217,7 +217,7 @@ py_modules/
     downloads.py                     # DownloadService — ROM downloads, ZIP/M3U, fcntl queue
     firmware.py                      # FirmwareService — BIOS registry + downloads
     session_lifecycle.py             # SessionLifecycleService — post-exit orchestration
-    migration.py                     # MigrationService — RetroDECK path + save-sort migration
+    migration.py                     # MigrationService — EmuDeck path + save-sort migration
     steamgrid.py                     # SteamGridService — SteamGridDB artwork
     artwork.py                       # ArtworkService — cover art staging/cleanup
     game_detail.py / playtime.py / achievements.py / settings.py / cores.py
@@ -232,7 +232,8 @@ py_modules/
                                      #    bios_file, firmware_cache, sync_run, kv_config)
     sqlite_migrations.py / machine_id.py  # schema migration runner (PRAGMA user_version) + machine-id reader
     download_file.py / firmware_file.py / migration_file.py / rom_files.py / save_file.py
-    retrodeck_paths.py / retroarch_config.py / retroarch_core_info.py / es_de_config.py
+    emudeck_paths.py / emudeck_launchers.py / emudeck_launch.py
+    retroarch_config.py / retroarch_core_info.py / es_de_config.py
     system_clock.py / system_uuid_gen.py / asyncio_sleeper.py / hostname.py / path_probe.py / plugin_metadata.py / debug_logger.py
   db/
     migrations/001_initial.sql       # SQLite schema DDL
@@ -259,7 +260,7 @@ src/                                 # Frontend TypeScript
   types/                             # TypeScript interfaces and Steam API declarations
   utils/                             # Shortcut CRUD, sync, downloads, collections, session manager
 bin/rom-launcher                     # Pure exec wrapper — runs the launch command baked into the shortcut
-defaults/config.json                 # platform_map: 149 platform slug -> RetroDECK system mappings
+defaults/config.json                 # platform_map: 149 platform slug -> EmuDeck system mappings
 tests/                               # Backend unit tests, mirroring py_modules/ layout
 ```
 

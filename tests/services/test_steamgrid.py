@@ -1,3 +1,4 @@
+from tests.fakes.fake_launch_resolver import FakeLaunchResolver
 import asyncio
 import http.client
 import os
@@ -80,6 +81,7 @@ def plugin(sgdb_artwork_cache, fake_romm_api, fake_steamgrid_db_api, uow):
             uow_factory=FakeUnitOfWorkFactory(uow=uow),
             active_core=FakeActiveCoreResolver(default=(None, None)),
             disc_resolver=FakeDiscResolver(),
+            launch_resolver=FakeLaunchResolver(),
         ),
     )
 
@@ -989,6 +991,7 @@ class TestDebugLoggerProtocolSeam:
                 uow_factory=FakeUnitOfWorkFactory(),
                 active_core=FakeActiveCoreResolver(default=(None, None)),
                 disc_resolver=FakeDiscResolver(),
+                launch_resolver=FakeLaunchResolver(),
             ),
         )
 

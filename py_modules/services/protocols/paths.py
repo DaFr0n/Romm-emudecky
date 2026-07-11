@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 if TYPE_CHECKING:
     from domain.save_layout import SaveLayout
     from domain.shortcut_data import EmulatorInvocation
+    from lib.emudeck_health import EmuDeckConfigHealth
     from lib.retrodeck_health import RetroDeckConfigHealth
 
 
@@ -26,7 +27,7 @@ class SystemResolver(Protocol):
 
 
 class RetroDeckPaths(Protocol):
-    """Bundled accessor for the RetroDECK runtime directory paths plus a
+    """Bundled accessor for the host-emulation directory paths plus a
     health signal for how trustworthy those paths are.
 
     Distinct method names per path are deliberate: a single
@@ -35,8 +36,17 @@ class RetroDeckPaths(Protocol):
     the type checker enough information to flag it. The path getters are
     best-effort and never raise; ``config_health`` is the loud signal
     ``main.py`` surfaces to the frontend when the resolved roots are
-    likely wrong (``retrodeck.json`` unreadable, or its resolved home
-    missing on disk).
+    likely wrong (config unreadable, or its resolved home missing on
+    disk).
+
+    Transitional naming (EmuDeck port plan §12): the method names retain
+    the historical ``retrodeck`` prefix during the port; the concrete
+    adapter in production is :class:`adapters.emudeck_paths.EmuDeckPathsAdapter`
+    (``retrodeck_home`` returns the Emulation root). The
+    ``config_health`` return is a union covering both
+    :class:`RetroDeckConfigHealth` (legacy adapter + fakes) and
+    :class:`EmuDeckConfigHealth` (production) so the composition root
+    can swap adapters without a service-wide rename in the same PR.
     """
 
     def saves_path(self) -> str: ...
@@ -49,7 +59,26 @@ class RetroDeckPaths(Protocol):
 
     def config_path(self) -> str: ...
 
-    def config_health(self) -> RetroDeckConfigHealth: ...
+    def config_health(self) -> RetroDeckConfigHealth | EmuDeckConfigHealth: ...
+
+
+class EmuDeckPaths(Protocol):
+    """EmuDeck-specific host path getters layered over :class:`RetroDeckPaths`.
+
+    The transitional ``RetroDeckPaths`` Protocol (above) carries the
+    historical per-host path getters services already consume; the EmuDeck
+    port adds ``launchers_path`` (where EmuDeck's per-emulator launcher
+    scripts live) for the new launch resolver seam. Adapters that expose
+    EmuDeck paths (:class:`adapters.emudeck_paths.EmuDeckPathsAdapter`)
+    satisfy both Protocols — the legacy fake stays at ``RetroDeckPaths``
+    because no launch-resolver service threads through it.
+    """
+
+    def launchers_path(self) -> str: ...
+
+    def roms_path(self) -> str: ...
+
+    def bios_path(self) -> str: ...
 
 
 class RetroArchSaveLayoutProvider(Protocol):

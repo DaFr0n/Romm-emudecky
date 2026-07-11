@@ -36,6 +36,7 @@ if TYPE_CHECKING:
         DebugLogger,
         DiscResolver,
         EventEmitter,
+        LaunchResolverFn,
         RommLibraryApi,
         SettingsPersister,
         Sleeper,
@@ -77,6 +78,7 @@ class LibraryServiceConfig:
     uow_factory: UnitOfWorkFactory
     active_core: ActiveCoreReader
     disc_resolver: DiscResolver
+    launch_resolver: LaunchResolverFn
 
 
 class LibraryService:
@@ -139,6 +141,7 @@ class LibraryService:
                 artwork=config.artwork,
                 active_core=config.active_core,
                 disc_resolver=config.disc_resolver,
+                launch_resolver=config.launch_resolver,
             )
         )
 

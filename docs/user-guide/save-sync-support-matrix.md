@@ -210,5 +210,5 @@ states still work locally). See the full table for specifics.
 
 ---
 
-_Coverage is reviewed against the emulator cores RetroDECK ships. Some 🔜 entries are awaiting on-device confirmation.
+_Coverage is reviewed against the emulator cores EmuDeck ships. Some 🔜 entries are awaiting on-device confirmation.
 Last reviewed 2026-06-05._

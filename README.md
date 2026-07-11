@@ -1,23 +1,10 @@
-![decky-romm-sync](assets/banner.png)
+# Romm-emudecky
 
-[![CI](https://github.com/danielcopper/decky-romm-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/danielcopper/decky-romm-sync/actions/workflows/ci.yml)
-[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=danielcopper_decky-romm-sync&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=danielcopper_decky-romm-sync)
-[![Coverage](https://img.shields.io/sonar/coverage/danielcopper_decky-romm-sync?server=https%3A%2F%2Fsonarcloud.io)](https://sonarcloud.io/summary/new_code?id=danielcopper_decky-romm-sync)
-[![Maintainability](https://sonarcloud.io/api/project_badges/measure?project=danielcopper_decky-romm-sync&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=danielcopper_decky-romm-sync)
-[![Reliability](https://sonarcloud.io/api/project_badges/measure?project=danielcopper_decky-romm-sync&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=danielcopper_decky-romm-sync)
-[![Security](https://sonarcloud.io/api/project_badges/measure?project=danielcopper_decky-romm-sync&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=danielcopper_decky-romm-sync)
-[![Downloads](https://img.shields.io/github/downloads/danielcopper/decky-romm-sync/total.svg)](https://github.com/danielcopper/decky-romm-sync/releases)
-
-# decky-romm-sync
+> **Fork** of [danielcopper/decky-romm-sync](https://github.com/danielcopper/decky-romm-sync) — ported from RetroDECK to EmuDeck.
 
 A [Decky Loader](https://decky.xyz/) plugin that syncs your self-hosted [RomM](https://github.com/rommapp/romm) library
 into Steam as non-steam shortcuts. Games appear directly in your Steam library, launch through
-[RetroDECK](https://retrodeck.net/), and keep their saves in sync across devices through your RomM server.
-
-## 📖 [Read the full documentation →](https://danielcopper.github.io/decky-romm-sync/)
-
-Installation, setup, save sync, BIOS management, troubleshooting, and the architecture reference all live on the
-documentation site. This README is just the quick tour.
+EmuDeck, and keep their saves in sync across devices through your RomM server.
 
 ## Features
 
@@ -31,8 +18,9 @@ documentation site. This README is just the quick tour.
 - **Per-platform control** — Choose exactly which platforms get synced
 - **Controller friendly** — Full gamepad navigation throughout the plugin UI
 - **Steam Input config** — Per-shortcut Steam Input mode (Default / Force On / Force Off)
-- **RetroDECK path migration** — Move your RetroDECK installation between storage locations without re-syncing
-- **RetroArch diagnostics** — Detects misconfigured input drivers that break menu navigation
+- **EmuDeck path migration** — Move your EmuDeck installation between storage locations without re-syncing
+- **EmuDeck health diagnostics** — Detects misconfigured input drivers and EmuDeck configuration issues that break
+  menu navigation
 
 ## Screenshots
 
@@ -48,7 +36,7 @@ documentation site. This README is just the quick tour.
   works in the Deck's Game Mode **or** in Big Picture Mode on any Linux PC
 - A running [RomM](https://github.com/rommapp/romm) server, **version 4.9.0 or newer** (the plugin stays inert against
   older servers)
-- [RetroDECK](https://retrodeck.net/) for launching games
+- [EmuDeck](https://www.emudeck.com/) for launching games
 
 ## Installation
 
@@ -66,12 +54,12 @@ This is the current method while v1.0 is in progress. It requires **Developer Mo
 gear icon → toggle **Developer Mode**).
 
 1. Download the latest `decky-romm-sync.zip` from the
-   [releases page](https://github.com/danielcopper/decky-romm-sync/releases)
+   [releases page](https://github.com/melikootje/Romm-emudecky/releases)
 2. In Decky settings → **Developer** tab → **Install Plugin from ZIP** (or **from URL** with the
-   [latest release link](https://github.com/danielcopper/decky-romm-sync/releases/latest/download/decky-romm-sync.zip))
+   [latest release link](https://github.com/melikootje/Romm-emudecky/releases/latest/download/decky-romm-sync.zip))
 
 > Full step-by-step instructions, including first-time setup, are in
-> [Getting Started](https://danielcopper.github.io/decky-romm-sync/user-guide/getting-started/).
+> [Getting Started](https://melikootje.github.io/Romm-emudecky/user-guide/getting-started/).
 
 ## Quick start
 
@@ -80,27 +68,29 @@ gear icon → toggle **Developer Mode**).
 3. In **Platforms**, enable the platforms you want to sync
 4. Hit **Sync Library** — your ROMs appear as non-steam shortcuts
 
-See the [User Guide](https://danielcopper.github.io/decky-romm-sync/user-guide/syncing-your-library/) for syncing
-details, [save sync](https://danielcopper.github.io/decky-romm-sync/user-guide/save-sync/), and
-[BIOS management](https://danielcopper.github.io/decky-romm-sync/user-guide/bios-management/).
+See the [User Guide](https://melikootje.github.io/Romm-emudecky/user-guide/syncing-your-library/) for syncing
+details, [save sync](https://melikootje.github.io/Romm-emudecky/user-guide/save-sync/), and
+[BIOS management](https://melikootje.github.io/Romm-emudecky/user-guide/bios-management/).
 
 ## Contributing
 
 Build from source, run the tests, and read the architecture reference on the documentation site:
 
-- [Development setup](https://danielcopper.github.io/decky-romm-sync/contributing/development/)
-- [Frontend dev loop](https://danielcopper.github.io/decky-romm-sync/contributing/frontend-dev-loop/) — live-reload the
+- [Development setup](https://melikootje.github.io/Romm-emudecky/contributing/development/)
+- [Frontend dev loop](https://melikootje.github.io/Romm-emudecky/contributing/frontend-dev-loop/) — live-reload the
   UI into a windowed Big Picture on the Deck, no Game Mode switching
-- [Backend architecture](https://danielcopper.github.io/decky-romm-sync/architecture/backend-architecture/)
+- [Backend architecture](https://melikootje.github.io/Romm-emudecky/architecture/backend-architecture/)
 
 ## Acknowledgments
 
 This plugin stands on the shoulders of some great projects:
 
+- [danielcopper/decky-romm-sync](https://github.com/danielcopper/decky-romm-sync) — the upstream project this is forked
+  from. Its RetroDECK integration was the foundation; this fork replaces the host layer with EmuDeck.
 - [RomM](https://github.com/rommapp/romm) — the self-hosted ROM manager at the heart of this plugin. RomM provides the
   library, metadata, cover art, and save file storage that makes the entire sync experience possible
-- [RetroDECK](https://retrodeck.net/) — the all-in-one emulation solution for Steam Deck that bundles ES-DE, RetroArch,
-  and standalone emulators into a single flatpak. Our entire launch chain runs through RetroDECK
+- [EmuDeck](https://www.emudeck.com/) — the all-in-one emulation solution for Steam Deck that bundles ES-DE, RetroArch,
+  and standalone emulators with launcher scripts. Our entire launch chain runs through EmuDeck
 - [Decky Loader](https://decky.xyz/) — the plugin framework that makes all of this possible
 - [Valve](https://www.valvesoftware.com/) — for the Steam Deck, SteamOS, and an open enough platform to build on
 - [Unifideck](https://github.com/ma3ke/unifideck) — inspiration for game detail page injection techniques and gamepad

@@ -1,6 +1,7 @@
 """Tests for DiscService — get_disc_selection (read) + select_disc (write)."""
-
 from __future__ import annotations
+
+from tests.fakes.fake_launch_resolver import FakeLaunchResolver
 
 import asyncio
 import contextlib
@@ -94,6 +95,7 @@ def service(event_loop, uow_factory, disc_resolver) -> DiscService:
             logger=logging.getLogger("test_disc"),
             uow_factory=uow_factory,
             disc_resolver=disc_resolver,
+            launch_resolver=FakeLaunchResolver(),
             active_core=FakeActiveCoreResolver(default=(None, None)),
         ),
     )

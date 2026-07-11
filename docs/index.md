@@ -3,7 +3,7 @@
 # decky-romm-sync
 
 A [Decky Loader](https://decky.xyz/) plugin that syncs your self-hosted [RomM](https://github.com/rommapp/romm) ROM
-library into Steam as Non-Steam shortcuts. Games launch through [RetroDECK](https://retrodeck.net/).
+library into Steam as Non-Steam shortcuts. Games launch through EmuDeck.
 
 - Browse your entire RomM library directly from Steam's Gaming Mode
 - Download ROMs on-demand with cover art, hero banners, logos, and metadata
@@ -22,7 +22,7 @@ library into Steam as Non-Steam shortcuts. Games launch through [RetroDECK](http
 4. **[Managing Games](user-guide/managing-games.md)** — Game detail panel, downloading ROMs, uninstalling, refreshing
    metadata
 5. **[BIOS Management](user-guide/bios-management.md)** — What BIOS files are, checking status, downloading per-platform
-6. **[RetroDECK Path Migration](user-guide/retrodeck-path-migration.md)** — Moving your RetroDECK installation between
+6. **[EmuDeck Path Migration](user-guide/retrodeck-path-migration.md)** — Moving your EmuDeck installation between
    storage locations
 7. **[Save Sync](user-guide/save-sync.md)** — Auto-sync, conflict resolution modes, manual sync, failed sync retries
 8. **[Troubleshooting](user-guide/troubleshooting.md)** — Common issues, fixes, Danger Zone explained
@@ -39,6 +39,8 @@ Developer-oriented documentation for contributors and those interested in the in
   parser layout template for local config/metadata files
 - **[Core and Emulator Selection](architecture/core-emulator-selection.md)** — Per-game vs per-system core overrides,
   the single read seam, and how the chosen core is baked into the launch command
+- **[EmuDeck Launch Resolution](architecture/emudeck-launch-resolution.md)** — How the plugin resolves EmuDeck launcher
+  scripts for per-platform launch commands
 - **[Development](contributing/development.md)** — Developer setup, building, testing, dev reload
 - **[Save File Sync Architecture](architecture/save-file-sync-architecture.md)** — Three-way conflict detection, session
   tracking, state schema, device registration

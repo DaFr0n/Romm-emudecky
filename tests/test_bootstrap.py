@@ -20,6 +20,7 @@ from fakes.fake_cover_art_file_store import FakeCoverArtFileStore
 from fakes.fake_download_file_store import FakeDownloadFileStore
 from fakes.fake_firmware_file_store import FakeFirmwareFileStore
 from fakes.fake_hostname_reader import FakeHostnameReader
+from fakes.fake_launch_resolver import FakeLaunchResolver
 from fakes.fake_machine_id_reader import FakeMachineIdReader
 from fakes.fake_migration_file_store import FakeMigrationFileStore
 from fakes.fake_path_exists_reader import FakePathExistsReader
@@ -270,6 +271,7 @@ class TestWireServices:
             "log_debug": MagicMock(),
             "plugin_metadata": FakePluginMetadataReader(version="0.14.0"),
             "uow_factory": FakeUnitOfWorkFactory(),
+            "launch_resolver": FakeLaunchResolver(),
         }
 
     @staticmethod
@@ -318,6 +320,7 @@ class TestWireServices:
                 log_debug=deps["log_debug"],
                 plugin_metadata=deps["plugin_metadata"],
                 uow_factory=deps["uow_factory"],
+                launch_resolver=deps["launch_resolver"],
             ),
             min_required_version=deps["min_required_version"],
         )

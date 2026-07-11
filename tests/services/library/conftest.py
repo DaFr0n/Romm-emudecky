@@ -8,6 +8,7 @@ under ``tests/services/library/`` consume the same ``plugin`` fixture
 so coverage of the façade integration and the sub-service internals
 sits on top of an identical setup.
 """
+from tests.fakes.fake_launch_resolver import FakeLaunchResolver
 
 import asyncio
 from unittest.mock import MagicMock
@@ -122,6 +123,7 @@ def plugin(tmp_path):
             uow_factory=FakeUnitOfWorkFactory(uow=uow),
             active_core=p._active_core,
             disc_resolver=FakeDiscResolver(),
+            launch_resolver=FakeLaunchResolver(),
         ),
     )
 

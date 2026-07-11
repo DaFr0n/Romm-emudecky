@@ -2,7 +2,7 @@
 
 ## Overview
 
-A RomM game launches through RetroDECK on some **emulator** — most often a **RetroArch libretro core**, but for a few
+A RomM game launches through EmuDeck on some **emulator** — most often a **RetroArch libretro core**, but for a few
 platforms (PS2, PS3, …) a **standalone emulator** (PCSX2, RPCS3) that ES-DE lists as the working default. Most games use
 their platform's default emulator, but the user can pin a different core for a single game (a **per-game** emulator
 override) or for a whole platform (a **per-platform** emulator override). This page documents how the plugin decides
@@ -11,7 +11,7 @@ which emulator a game uses, where that decision is stored, and how it is applied
 The central rule: **the read-path core equals the launched core.** Whatever core the plugin reports for a game — in the
 BIOS-requirement filter, the save-directory name, the save-sync core tag, the core-change warning, the game-detail badge
 — is the exact core that game will launch on. A single resolver guarantees that, and the launch command is baked from
-the same resolved emulator. The plugin **owns emulator selection end to end**: it reads RetroDECK/ES-DE configuration
+the same resolved emulator. The plugin **owns emulator selection end to end**: it reads EmuDeck/ES-DE configuration
 for the default emulator, but its own launches never depend on ES-DE's `gamelist.xml` — it neither reads nor writes that
 file. The **live `es_systems.xml` is the sole source** for the system-layer default and the picker's emulator list;
 there is no bundled snapshot (the curated `core_defaults.json` and its generator were deleted in #1210). See
@@ -30,7 +30,7 @@ of two payloads:
 - **`kind == "libretro"`** — a RetroArch core, identified by its bare `.so` name (`core_so`). Rendered as the
   `-e "%EMULATOR_RETROARCH% -L <coresdir>/<so>.so %ROM%"` form. This is the overwhelming-majority path.
 - **`kind == "standalone"`** — a standalone emulator, identified by its full ES-DE `<command>` text (already ending in
-  `%ROM%`, e.g. `%EMULATOR_RPCS3% --no-gui %ROM%`). Baked verbatim into `-e`. RetroDECK resolves `%EMULATOR_*%` and
+  `%ROM%`, e.g. `%EMULATOR_RPCS3% --no-gui %ROM%`). Baked verbatim into `-e`. EmuDeck resolves `%EMULATOR_*%` and
   substitutes `%ROM%` at launch, the same as the libretro form. This is the standalone-emulator seam
   ([#129](https://github.com/danielcopper/decky-romm-sync/issues/129)): a system whose working ES-DE default is a
   standalone emulator (PS2 → PCSX2, PS3 → RPCS3, GameCube/Wii → Dolphin, PSP → PPSSPP, …) launches on that emulator
@@ -47,7 +47,7 @@ A standalone emulator has **no** libretro `.so`, so the read-path projection rep
 
 ## The two override scopes
 
-The plugin owns two **deviations** from the RetroDECK default core. Each stores only the deviation as a core LABEL;
+The plugin owns two **deviations** from the EmuDeck default core. Each stores only the deviation as a core LABEL;
 absence means "follow the default."
 
 | Scope            | Stored where                                             | Applies to              | Written by                     |
@@ -56,7 +56,7 @@ absence means "follow the default."
 | **Per-platform** | `settings.json` — `platform_cores` map (`{slug: label}`) | every ROM on a platform | the plugin (`set_system_core`) |
 
 Both overrides are the plugin's own state and live in the plugin's own stores. Neither is written into ES-DE's
-`gamelist.xml` — the plugin **never writes that file**. It still **reads** the RetroDECK/ES-DE configuration it does not
+`gamelist.xml` — the plugin **never writes that file**. It still **reads** the EmuDeck/ES-DE configuration it does not
 own (the live `es_systems.xml` — the system default emulator and the full classified command list the picker offers),
 but the per-game and per-platform deviations are layered on top of that read by the plugin itself.
 
@@ -65,7 +65,7 @@ but the per-game and per-platform deviations are layered on top of that read by 
 `roms.emulator_override` is a nullable `TEXT` column added by migration `002_add_emulator_override.sql`. It holds the
 core **LABEL** the user picked (e.g. `"Beetle PSX HW"`), exactly as ES-DE displays it — never a resolved `.so` filename.
 
-- **`NULL` = no override** → the game follows the RetroDECK/ES-DE default.
+- **`NULL` = no override** → the game follows the EmuDeck/ES-DE default.
 - It anchors on `roms`, not `rom_installs`, so the choice **survives uninstall/reinstall** (per
   [ADR-0007](https://github.com/danielcopper/decky-romm-sync/blob/main/docs/adr/0007-rom-retention-identity-anchor.md)).
 - Mutations go through the verb-named aggregate methods `Rom.pin_emulator_override(label)` (rejects a blank label) and
@@ -73,7 +73,7 @@ core **LABEL** the user picked (e.g. `"Beetle PSX HW"`), exactly as ES-DE displa
   clause**, so a re-sync never wipes a user's pin.
 
 The plugin stores the **deviation** (the LABEL, or `NULL`), not a resolved core. The default and system layers are owned
-by RetroDECK/ES-DE and change externally — a RetroDECK update can ship a new default emulator — so a stored resolved
+by EmuDeck/ES-DE and change externally — an EmuDeck update can ship a new default emulator — so a stored resolved
 value would go stale. Storing only the deviation keeps the plugin authoritative over exactly the slice it owns and
 re-resolves the rest live. The LABEL is turned into an `EmulatorInvocation` (a libretro `.so` **or** a standalone
 command) through the live-`es_systems.xml` classified option list at use time
@@ -146,7 +146,7 @@ live `es_systems.xml` document order** (see
 (PCSX2, RPCS3, Dolphin, …) or libretro. It reads **only** the live file — no bundled snapshot, and **no gamelist**
 (neither a per-game `<altemulator>` nor a system-level `<alternativeEmulator>`; the gamelist is off every plugin code
 path). When nothing is bakeable, or `es_systems.xml` cannot be read, it returns `None` and the caller bakes the plain
-RetroDECK launch.
+EmuDeck launch.
 
 ### Standalone-emulator selection: first safely-bakeable
 
@@ -165,7 +165,7 @@ A command is `bakeable` only when it is a real emulator invocation the plugin ca
 4. contains `"` or `\;` → `unbakeable` (`"quoting"`);
 5. any placeholder outside the whitelist (`%EMULATOR_*%`, `%ROM%`, `%CORE_RETROARCH%`, `%GAMEDIR%`, `%GAMEDIRRAW%`,
    `%ROMPATH%`, `%BASENAME%`, `%FILENAME%`, `%ROMRAW%`, `%STARTDIR%`) → `unbakeable` (`"unknown_placeholder"`);
-6. contains `%STARTDIR%` → `unbakeable` (`"startdir"`) — RetroDECK's `run_game.sh` parses-but-drops it, so a baked
+6. contains `%STARTDIR%` → `unbakeable` (`"startdir"`) — EmuDeck's launcher scripts parse-but-drop it, so a baked
    command would launch from the wrong directory (a v1 limitation);
 7. otherwise `bakeable`.
 
@@ -175,7 +175,7 @@ skips it and bakes the next command (the direct `--no-gui` launch): the shortcut
 standalone invocation. The kind is `libretro` when the command matches the strict RetroArch shape
 (`%EMULATOR_RETROARCH% -L %CORE_RETROARCH%/<core>_libretro.so %ROM%`), else `standalone`.
 
-**Existence probe (a bakeable standalone whose emulator is not installed → `needs_setup` `not_installed`).** RetroDECK
+**Existence probe (a bakeable standalone whose emulator is not installed → `needs_setup` `not_installed`).** EmuDeck
 lists more standalone emulators in `es_systems.xml` than it bundles, so a system's bakeable default could name an
 emulator that is not on disk (Ryubing on `switch`, any un-installed external component) — baking it produces a shortcut
 that dies in ~0.4 s. To prevent that regression the adapter probes existence against the sibling `es_find_rules.xml`: it
@@ -184,10 +184,10 @@ maps a standalone command's `%EMULATOR_<NAME>%` token to the find-rule entry, ch
 glob-aware), and hands the verdict to the pure `downgrade_if_not_installed(option, installed)` rule — which turns a
 bakeable **standalone** whose emulator is absent into `needs_setup` with reason `not_installed`. It then drops out of
 `select_default_option` (the system plain-launches, as it did before #1210) and shows disabled in the picker. The probe
-is **absence-only** — it downgrades only on positive evidence that a RetroDECK component (`retrodeck/components/…` or
-`retrodeck/external_components/…`) is missing; a `systempath`-only emulator (binary on RetroDECK's sandbox `PATH`, not
+is **absence-only** — it downgrades only on positive evidence that a EmuDeck component (`retrodeck/components/…` or
+`retrodeck/external_components/…`) is missing; a `systempath`-only emulator (binary on EmuDeck's sandbox `PATH`, not
 visible from outside), an emulator with no find rule, and the whole `es_find_rules.xml`-unreadable case are all assumed
-installed, so it never falsely downgrades. Libretro is always installed (RetroArch ships with RetroDECK), so libretro
+installed, so it never falsely downgrades. Libretro is always installed (RetroArch ships with EmuDeck), so libretro
 options are never downgraded. See [ADR-0020](../adr/0020-live-es-systems-emulator-resolution.md) §2.
 
 `get_emulator_options(system)` returns `{"available": bool, "options": [EmulatorOption, ...]}`. **`available` is `False`
@@ -198,7 +198,7 @@ entries are clickable, the default is marked, and `needs_setup` / `unbakeable` e
 See [ADR-0020](../adr/0020-live-es-systems-emulator-resolution.md) — including the 27 default flips this selection rule
 produces relative to the old first-libretro default.
 
-Adding a new standalone system needs **no plugin change** — the moment a RetroDECK update lists its emulator in
+Adding a new standalone system needs **no plugin change** — the moment a EmuDeck update lists its emulator in
 `es_systems.xml` in preference order, the plugin's default follows.
 
 **Every per-game core read consumer draws from this one seam**, so the launch core cannot diverge from any derived
@@ -212,49 +212,47 @@ value:
 | `StatusService.check_core_change`             | detect a core change since the last save sync               |
 | `GameDetailService` → CPU badge / Active Core | the core shown on the game detail page                      |
 
-A pinned per-game or per-platform label that no longer resolves (the core was removed by a RetroDECK update) is **never
+A pinned per-game or per-platform label that no longer resolves (the core was removed by a EmuDeck update) is **never
 fatal**: the resolver logs a WARNING and degrades to the next layer (the per-platform core, then the es_systems
 default). No consumer ever sees a bogus `.so`.
 
-## Application: baking `-e` into `launch_options`
+## Application: baking launcher commands into `launch_options`
 
 Per
 [ADR-0009](https://github.com/danielcopper/decky-romm-sync/blob/main/docs/adr/0009-launcher-pure-exec-wrapper-baked-launch-options.md),
 the launcher is a pure `exec "$@"` wrapper and the full launch command lives in the Steam shortcut's `launch_options`.
 The pure seam `domain.shortcut_data.resolve_emulator_invocation(rom, emulator)` takes the resolved `EmulatorInvocation`
-and renders the invocation:
+and renders the invocation using EmuDeck's per-system launcher scripts:
 
-- **libretro** invocation → the RetroArch `-e` form:
-
-  ```text
-  flatpak run net.retrodeck.retrodeck -e "%EMULATOR_RETROARCH% -L /var/config/retroarch/cores/<core>.so %ROM%"
-  ```
-
-- **standalone** invocation → the emulator's full ES-DE command baked verbatim:
+- **libretro** invocation → EmuDeck's RetroArch launcher script:
 
   ```text
-  flatpak run net.retrodeck.retrodeck -e "%EMULATOR_RPCS3% --no-gui %ROM%"
+  <storagePath>/Emulation/tools/launchers/retroarch.sh -L <coresdir>/<core>.so "<rom_path>"
   ```
 
-- `emulator is None` → the plain `flatpak run net.retrodeck.retrodeck`.
+- **standalone** invocation → EmuDeck's per-system launcher script:
 
-`%EMULATOR_*%` and `%ROM%` stay as ES-DE placeholders — RetroDECK's `run_game.sh` resolves and single-quotes them at
-launch, so a ROM path with spaces or parens is handled. For the libretro form, only the in-sandbox cores directory
-(`/var/config/retroarch/cores`) is baked literally; ES-DE's `%CORE_RETROARCH%` variable is **not** expanded through
-`-e`, so the plugin bakes the resolved path itself (a standalone command carries no `%CORE_RETROARCH%`, so it bakes
-as-is). The `-e` flag makes RetroDECK skip its gamelist lookup entirely, which is why a baked emulator applies for any
-filename (see
+  ```text
+  <storagePath>/Emulation/tools/launchers/<system>.sh "<rom_path>"
+  ```
+
+- `emulator is None` → the plain EmuDeck launcher invocation without emulator arguments.
+
+EmuDeck's launcher scripts resolve `%EMULATOR_*%` and `%ROM%` placeholders at launch, so ROM paths with spaces or
+parens are handled. The launcher scripts are located at `<storagePath>/Emulation/tools/launchers/` and are discovered
+by the `EmuDeckLauncherAdapter` (see [EmuDeck Launch Resolution](emudeck-launch-resolution.md)). The plugin bakes the
+resolved launcher script path and arguments, making the launch independent of ES-DE's gamelist lookup (see
 [Why the plugin always bakes the core, never the gamelist](#why-the-plugin-always-bakes-the-core-never-the-gamelist)).
 
 **Always `-e`.** Per
 [ADR-0012](https://github.com/danielcopper/decky-romm-sync/blob/main/docs/adr/0012-plugin-owns-core-selection-always-e-no-gamelist.md),
-every installed ROM bakes its **full resolved active emulator** through `-e` — the per-game pin, the per-platform core,
-the es_systems libretro default, or a standalone emulator, whichever the resolver returns. The plain `flatpak run`
-launch is **not** the "no override" case any more; it is reserved for the single fallback where the resolver yields
-`None` (a platform with no resolvable default at all). Baking the default for every ROM is what lets the plugin own
-launch selection completely: a launch that is _not_ `-e` would let RetroDECK consult the gamelist, re-coupling the
-plugin to ES-DE's state. The cost is that a RetroDECK update changing a platform's default core needs a **Force Full
-Sync** to re-bake — see [A frozen default needs a Force Full Sync](#a-frozen-default-needs-a-force-full-sync).
+every installed ROM bakes its **full resolved active emulator** through the appropriate launcher script — the per-game
+pin, the per-platform core, the es_systems libretro default, or a standalone emulator, whichever the resolver returns.
+The plain launcher invocation is **not** the "no override" case any more; it is reserved for the single fallback where
+the resolver yields `None` (a platform with no resolvable default at all). Baking the default for every ROM is what lets
+the plugin own launch selection completely: a launch without the baked launcher would let EmuDeck consult the gamelist,
+re-coupling the plugin to ES-DE's state. The cost is that a EmuDeck update changing a platform's default core needs a
+**Force Full Sync** to re-bake — see [A frozen default needs a Force Full Sync](#a-frozen-default-needs-a-force-full-sync).
 
 ### The three bake sites
 
@@ -266,7 +264,7 @@ emulator** through the same `ActiveCoreResolver.active_emulator_for_rom` seam an
 | -------------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `SyncOrchestrator` → `_build_core_overrides` | every sync (preview + apply)             | each ROM through `active_emulator_for_rom` → `{rom_id: EmulatorInvocation}` for the bake |
 | `DownloadService` → `_resolve_bound_app_id`  | on download-complete (install/reinstall) | the ROM through `active_emulator_for_rom` in the same flow                               |
-| `MigrationService` → `_build_relaunch_items` | on RetroDECK-home migration              | each relocated ROM through `active_emulator_for_rom`                                     |
+| `MigrationService` → `_build_relaunch_items` | on EmuDeck-home migration              | each relocated ROM through `active_emulator_for_rom`                                     |
 
 The download-complete bake is the one that re-applies a pin after reinstall — the exact path `roms` storage was chosen
 to protect. Each site bakes `-e` for every ROM that resolves to a concrete emulator (libretro or standalone), and the
@@ -290,7 +288,7 @@ and never a disc index.
 
 - **`NULL` = no selection** → the ROM follows the **default**: the install's `.m3u` when `file_path` is one (the
   in-emulator disc-swap default), else the first enumerated disc.
-- It anchors on `roms`, not `rom_installs`, so the pick **survives uninstall/reinstall and RetroDECK-home migration**
+- It anchors on `roms`, not `rom_installs`, so the pick **survives uninstall/reinstall and EmuDeck-home migration**
   (per
   [ADR-0007](https://github.com/danielcopper/decky-romm-sync/blob/main/docs/adr/0007-rom-retention-identity-anchor.md))
   — the disc folder is gone while uninstalled, but the basename re-resolves the moment it returns.
@@ -365,7 +363,7 @@ never bakes that shared dir). Because it triggers only when the resolved path st
 disc resolution — a resolved disc path (`…(Disc 2).cue`) has no marker, so a multi-disc ROM is never folder-stripped,
 and the folder rule applies only when disc resolution returned `file_path`.
 
-**The invocation form.** RetroDECK's `run_game.sh` reinterprets any directory `%ROM%` as an ES-DE "directory as a file"
+**The invocation form.** EmuDeck's launcher scripts handle directory-based games differently than file-based games.
 (`game="$game/$(basename "$game")"`, `run_game.sh:63-67`), so the standalone `-e "%EMULATOR_RPCS3% --no-gui %ROM%"` form
 handed a folder points RPCS3 at a nonexistent `…/<Game>/<Game>` and never boots. A folder-boot standalone is therefore
 baked as a **direct sandbox invocation** that bypasses `run_game.sh`:
@@ -478,18 +476,18 @@ ES-DE stores core choices in `gamelist.xml` — a per-game `<altemulator>` eleme
 `<alternativeEmulator>`. The plugin does **not** use that file for its own launches at all (it neither reads nor writes
 it), for reasons grounded in on-device testing:
 
-1. **RetroDECK's gamelist lookup is metacharacter-fragile.** When the plugin's Steam shortcut launches a ROM with a
-   plain `flatpak run` command, RetroDECK's `run_game.sh` matches the ROM path against the gamelist using an **awk `~`
+1. **EmuDeck's gamelist lookup is metacharacter-fragile.** When the plugin's Steam shortcut launches a ROM with a
+   plain `flatpak run` command, EmuDeck's launcher scripts match the ROM path against the gamelist using an **awk `~`
    regex**. Any regex metacharacter in the filename (`(USA)`, `(Disc 1)`, `[!]`, …) breaks the match, and the per-game
    `<altemulator>` is silently dropped. This is upstream bug
    [#210](https://github.com/danielcopper/decky-romm-sync/issues/210) /
    [RetroDECK#1358](https://github.com/RetroDECK/RetroDECK/issues/1358). (ES-DE's _own_ UI resolves `<altemulator>`
    itself and bypasses the awk — which is why a core choice can look like it works when launched from ES-DE but not from
    the plugin's shortcut.)
-2. **`-e` bypasses the lookup.** RetroDECK's `-e` flag sets the emulator invocation directly and skips the gamelist awk
+2. **`-e` bypasses the lookup.** EmuDeck's `-e` flag sets the emulator invocation directly and skips the gamelist awk
    block, so the baked core applies regardless of filename. The plugin bakes the resolved core into `-e` for **every**
    installed ROM and is no longer coupled to either the awk bug or ES-DE's folder-collapse display quirks.
-3. **A plain launch re-couples the plugin to ES-DE.** A non-`-e` launch lets RetroDECK consult the gamelist itself, so a
+3. **A plain launch re-couples the plugin to ES-DE.** A non-`-e` launch lets EmuDeck consult the gamelist itself, so a
    core a user set inside ES-DE's UI would silently affect the plugin's launch — diverging from the BIOS badge, the
    per-core save path, and the core-change warning that all follow the plugin's resolver. Baking `-e` for every ROM
    ([ADR-0012](https://github.com/danielcopper/decky-romm-sync/blob/main/docs/adr/0012-plugin-owns-core-selection-always-e-no-gamelist.md))
@@ -511,23 +509,23 @@ per-platform core once through the System-page Emulator Core picker (the menu bu
 
 ### A frozen default needs a Force Full Sync
 
-Because the es_systems default is baked literally into every shortcut, a RetroDECK update that ships a **new default
+Because the es_systems default is baked literally into every shortcut, a EmuDeck update that ships a **new default
 core for a platform** does **not** take effect on a normal sync — a normal sync skips platforms whose ROM set is
 unchanged, so the previously-baked default survives. A **Force Full Sync** re-bakes every shortcut and picks up the new
 default. A core the user sets through the plugin (per-game pin or per-platform picker) re-bakes immediately, so only an
-externally-changed RetroDECK default carries this caveat.
+externally-changed EmuDeck default carries this caveat.
 
-## RetroDECK is the V1 target
+## EmuDeck is the V1 target
 
 The `-e` flag, the `%EMULATOR_RETROARCH%` / `%ROM%` placeholders, and the `/var/config/retroarch/cores` path are
-**RetroDECK-adapter concerns**, isolated at the single seam `resolve_emulator_invocation`. RetroDECK is the supported
+**EmuDeck-adapter concerns**, isolated at the single seam `resolve_emulator_invocation`. EmuDeck is the supported
 launcher for V1 — this is the correct V1 shape, not a placeholder. The per-ROM **selection** (which emulator does this
 ROM resolve to?) is a service-layer read; the seam only **renders** the chosen `EmulatorInvocation` into a command
 string. Standalone-emulator support ([#129](https://github.com/danielcopper/decky-romm-sync/issues/129)) is the first
-half of the multi-emulator lift: a standalone emulator is still launched **through RetroDECK's `-e`**, so the RetroDECK
+half of the multi-emulator lift: a standalone emulator is still launched **through EmuDeck's `-e`**, so the EmuDeck
 flatpak invocation remains the single seam — only the `-e` payload changed (a verbatim ES-DE command instead of the
 RetroArch `-L` form). The remaining lift ([#918](https://github.com/danielcopper/decky-romm-sync/issues/918)) — a
-non-RetroDECK launcher behind a `Frontend`-style port — is net-new work and is not built until a second launcher is
+non-EmuDeck launcher behind a `Frontend`-style port — is net-new work and is not built until a second launcher is
 concrete.
 
 The **core picker now lists standalone emulators alongside libretro cores** (#1210 / ADR-0020) — you _can_ choose
@@ -541,6 +539,7 @@ efforts.
 **Related pages:**
 
 - [Backend Architecture](backend-architecture.md) — service/adapter layering, dependency diagram
+- [EmuDeck Launch Resolution](emudeck-launch-resolution.md) — EmuDeck launcher-script resolution system
 - [Config Source Parsers](config-source-parsers.md) — one-parser-per-source principle; how the live `es_systems.xml` is
   read as the sole core/emulator source (the gamelist and the bundled `core_defaults.json` are no longer read)
 - [Steam Non-Steam Shortcuts](steam-non-steam-shortcuts.md) — AddShortcut API, `launch_options`, app-id derivation

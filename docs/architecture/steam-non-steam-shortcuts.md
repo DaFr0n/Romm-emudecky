@@ -53,7 +53,7 @@ A shortcut's `appId` is derived from `exe + appName` (CRC32). Two consequences f
   `SetAppLaunchOptions` on an existing shortcut is **reliable** — confirmed on hardware in
   [#827](https://github.com/danielcopper/decky-romm-sync/issues/827) across in-session writes, a Steam restart, and
   removal-churn re-syncs. The plugin uses it directly to bake the launch command in at download-complete and to
-  re-resolve paths after a RetroDECK-home migration.
+  re-resolve paths after a EmuDeck-home migration.
 - **`exe` and `appName` are destructive.** Changing either yields a _different_ `appId` — effectively a new shortcut. A
   launch-config change that touches `exe` or the name therefore requires delete + recreate (re-sync); a
   `launchOptions`-only change does not.
@@ -138,7 +138,7 @@ See: `src/patches/gameDetailPatch.tsx`, `src/components/RomMPlaySection.tsx`
 
 Beyond the custom UI, the plugin writes three fields directly onto each RomM shortcut's `SteamAppOverview` so the
 shortcut presents like a native Steam game: `controller_support = 2` (the "Full Controller Support" badge — important so
-Game Mode doesn't flag the controller-driven RetroDECK launch), `metacritic_score` (from RomM's `average_rating`), and
+Game Mode doesn't flag the controller-driven EmuDeck launch), `metacritic_score` (from RomM's `average_rating`), and
 `m_setStoreCategories` (RomM's `steam_categories`).
 
 Steam rebuilds `appStore` from scratch on every `SharedJSContext` mount, so these in-memory mutations are lost on each
@@ -171,7 +171,7 @@ Each entry has these key fields:
 | `AppName`       | string       | Display name                                                                                                                                                                                                                                          |
 | `Exe`           | string       | **Quoted** path: `"/path/to/exe"`                                                                                                                                                                                                                     |
 | `StartDir`      | string       | **Quoted** path: `"/path/to/dir"`                                                                                                                                                                                                                     |
-| `LaunchOptions` | string       | The full launch command the `bin/rom-launcher` exec wrapper runs, e.g. `flatpak run net.retrodeck.retrodeck "/path/to/game.iso"` — or `""` (placeholder) for an uninstalled ROM. No `romm:<id>` marker; ownership is detected by the exe path instead |
+| `LaunchOptions` | string       | The full launch command the `bin/rom-launcher` exec wrapper runs, e.g. EmuDeck launcher script invocation like `<storagePath>/Emulation/tools/launchers/retroarch.sh "/path/to/game.iso"` — or `""` (placeholder) for an uninstalled ROM. No `romm:<id>` marker; ownership is detected by the exe path instead |
 | `appid`         | signed int32 | Assigned by Steam when `AddShortcut` runs; stored as the signed int32 form (`to_signed_app_id`)                                                                                                                                                       |
 | `icon`          | string       | Icon path or hash                                                                                                                                                                                                                                     |
 | `tags`          | object       | Steam collection tags. The plugin manages collections via `collectionStore` (machine-scoped names like `RomM: N64 (steamdeck)`), not by writing this VDF field.                                                                                       |

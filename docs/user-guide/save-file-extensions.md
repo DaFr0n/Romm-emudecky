@@ -1,11 +1,11 @@
 # Save File Extensions
 
-Research results for which save file extensions RetroDECK cores produce, and what our plugin needs to support. This
+Research results for which save file extensions EmuDeck cores produce, and what our plugin needs to support. This
 informs the implementation of [#196](https://github.com/danielcopper/decky-romm-sync/issues/196).
 
 !!! note "Superseded in part by the full audit"
 
-    A later core-by-core audit of all 155 RetroDECK cores is captured in the
+    A later core-by-core audit of all 155 EmuDeck cores is captured in the
     [Save sync support matrix](save-sync-support-matrix.md), with the rationale in
     [Save sync coverage](../architecture/save-sync-coverage.md). It **revisits some assumptions on this page** —
     notably that Saturn (Beetle Saturn writes `.bkr`/`.bcr`/`.smpc`, not `.srm`), Neo Geo Pocket (`.flash`/`.ngf`),
@@ -27,9 +27,9 @@ RetroArch has two save mechanisms:
 
 This means `.srm`/`.rtc` covers the vast majority of cores. Only a handful of cores use custom extensions.
 
-## RetroDECK Core Inventory
+## EmuDeck Core Inventory
 
-Checked against RetroDECK's installed cores (March 2026). Only cores relevant to save file sync are listed.
+Checked against EmuDeck's installed cores (March 2026). Only cores relevant to save file sync are listed.
 
 ### Cores Using Standard `.srm`/`.rtc` (libretro_saves = true)
 
@@ -93,7 +93,7 @@ These cores all produce `.srm` (and optionally `.rtc`). No additional extensions
 
 - `libretro_saves = "false"` -- manages its own saves
 - In practice, gpsp writes `.sav` files in its own format
-- However, mgba/vbam are the recommended GBA cores in RetroDECK
+- However, mgba/vbam are the recommended GBA cores in EmuDeck
 - **Action**: Add `.sav` defensively to GBA overrides for gpsp users
 
 #### mednafen_gba (Beetle GBA) -- custom format
@@ -101,7 +101,7 @@ These cores all produce `.srm` (and optionally `.rtc`). No additional extensions
 - No `libretro_saves` field -- uses Mednafen's native format
 - Can write `.{md5}.sav` and `.{md5}.eep` with MD5 hash in filename
 - Has a dual mode: Mednafen method (own files) vs libretro method (`.srm`)
-- Rarely used in RetroDECK (mgba is the default)
+- Rarely used in EmuDeck (mgba is the default)
 - **Action**: Not worth supporting the MD5-hashed filenames. Users of this core should use libretro mode.
 
 ## Comparison With Other RomM Clients
@@ -115,7 +115,7 @@ Uses a **flat global allowlist** of 11 extensions with no per-platform mapping:
 ```
 
 This is intentionally broad -- Grout targets multiple CFWs (muOS, NextUI, MinUI) where standalone emulators produce
-these formats. For RetroArch-only setups like RetroDECK, most of these are unnecessary.
+these formats. For RetroArch-only setups like EmuDeck, most of these are unnecessary.
 
 ### Argosy (Android client)
 
@@ -130,11 +130,11 @@ Uses a **per-emulator** mapping:
 | DuckStation (standalone)    | `.mcd`                         |
 | MAME                        | `.nv`                          |
 
-Again, standalone emulator formats that don't apply to RetroDECK's RetroArch-based setup.
+Again, standalone emulator formats that don't apply to EmuDeck's RetroArch-based setup.
 
 ## Implementation Decision
 
-For decky-romm-sync (RetroDECK-only):
+For decky-romm-sync (EmuDeck-only):
 
 | Extension                      | Include?                          | Reason                                                       |
 | ------------------------------ | --------------------------------- | ------------------------------------------------------------ |
@@ -150,7 +150,7 @@ For decky-romm-sync (RetroDECK-only):
 
 ### System Override Map
 
-Override keys are RetroDECK **system** names (the normalized value from `resolve_system` / `platform_map`), not raw RomM
+Override keys are EmuDeck **system** names (the normalized value from `resolve_system` / `platform_map`), not raw RomM
 platform slugs — this keeps the extension lookup aligned with the save directory, cores, and gamelists, which are all
 system-keyed.
 

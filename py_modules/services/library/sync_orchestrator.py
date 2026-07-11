@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from domain.preview_delta import PreviewDelta
-from domain.shortcut_data import EmulatorInvocation, build_shortcuts_data
+from domain.shortcut_data import build_shortcuts_data
 from domain.sibling_group import compute_component_group_keys
 from domain.sibling_resolution import AUTO_REGION
 from domain.sync_diff import (
@@ -53,6 +53,7 @@ if TYPE_CHECKING:
         Clock,
         DiscResolver,
         EventEmitter,
+        LaunchResolverFn,
         Sleeper,
         UnitOfWorkFactory,
         UuidGen,
@@ -112,6 +113,7 @@ class SyncOrchestratorConfig:
     artwork: ArtworkManager
     active_core: ActiveCoreReader
     disc_resolver: DiscResolver
+    launch_resolver: LaunchResolverFn
 
 
 class SyncOrchestrator:
@@ -133,6 +135,7 @@ class SyncOrchestrator:
         self._reporter = config.reporter
         self._active_core = config.active_core
         self._disc_resolver = config.disc_resolver
+        self._launch_resolver = config.launch_resolver
 
     # ── Sync control ─────────────────────────────────────────────
 
@@ -217,14 +220,14 @@ class SyncOrchestrator:
                 await self._fetch_preview_unit(unit, all_roms, platform_rom_ids, synced_rom_ids, collection_memberships)
 
             installed_paths = await self._loop.run_in_executor(None, self._scan_installed_paths)
-            core_overrides = await self._loop.run_in_executor(None, self._build_core_overrides, all_roms)
+            invocations = await self._loop.run_in_executor(None, self._build_invocations, all_roms)
             # Stamp each fresh ROM's component sibling-group key before the build so
             # the collapse below groups games, not dumps. The preview union is a
             # complete view of every enabled platform's groups; the DB's persisted
             # keys seed a member edging into a resident sibling on a skipped platform.
             resident_keys = await self._loop.run_in_executor(None, self._read_resident_group_keys)
             self._stamp_component_group_keys(all_roms, resident_keys)
-            shortcuts_data = build_shortcuts_data(all_roms, self._plugin_dir, installed_paths, core_overrides)
+            shortcuts_data = build_shortcuts_data(all_roms, self._plugin_dir, installed_paths, invocations)
             platform_name_set = {u.name for u in work_queue if u.type == "platform"}
             slug_to_name = {u.slug: u.name for u in work_queue if u.type == "platform" and u.slug}
             registry, last_synced_platforms, last_synced_collections = await self._loop.run_in_executor(
@@ -810,7 +813,7 @@ class SyncOrchestrator:
         installed_paths = await self._loop.run_in_executor(
             None, self._read_installed_paths, {rom["id"] for rom in unit_roms}
         )
-        core_overrides = await self._loop.run_in_executor(None, self._build_core_overrides, unit_roms)
+        invocations = await self._loop.run_in_executor(None, self._build_invocations, unit_roms)
 
         # Read the bound-row registry once, before the build: its persisted keys
         # seed the component keying (a fresh member edging into a DB-resident
@@ -820,7 +823,7 @@ class SyncOrchestrator:
             int(rom_id): entry["sibling_group_key"] for rom_id, entry in registry.items() if entry["sibling_group_key"]
         }
         self._stamp_component_group_keys(unit_roms, resident_keys)
-        shortcuts_data = build_shortcuts_data(unit_roms, self._plugin_dir, installed_paths, core_overrides)
+        shortcuts_data = build_shortcuts_data(unit_roms, self._plugin_dir, installed_paths, invocations)
 
         # Collapse to one Steam shortcut per sibling group (ADR-0021): only the
         # representative (plus any grandfathered bound siblings) is emitted; a
@@ -1041,25 +1044,24 @@ class SyncOrchestrator:
             stale_rom_ids=[rom_id for rom_id, _app_id in stale],
         )
 
-    def _build_core_overrides(self, roms: list[dict[str, Any]]) -> dict[int, EmulatorInvocation]:
-        """Resolve each ROM's FULL active emulator for the bake.
+    def _build_invocations(self, roms: list[dict[str, Any]]) -> dict[int, str]:
+        """Pre-resolve launch invocations for every ROM in *roms*.
 
-        Runs every ROM in *roms* through the shared per-ROM ``active_core``
-        resolver (the single seam that folds the per-game ``emulator_override``
-        and per-platform ``settings.json`` core over the standalone-aware
-        es_systems default). Only ROMs that resolve to an emulator (libretro core
-        or standalone) appear in the returned ``{rom_id: EmulatorInvocation}``
-        map, so :func:`build_shortcuts_data` bakes their ``-e`` form; a ROM that
-        resolves to nothing (a genuinely unresolvable platform) is absent and
-        falls back to the plain launch. The resolver already warns + degrades on
-        a stale label, so no bogus invocation ever reaches the bake.
+        Runs every ROM through the shared ``active_core`` resolver then the
+        shared ``launch_resolver`` to produce the invocation prefix. Only ROMs
+        that resolve to ``ok`` (launcher on disk and emulator resolved) appear
+        in the returned map; a ROM absent from the map gets an empty
+        ``launch_options`` placeholder in ``build_shortcuts_data`` and surfaces
+        ``needs_setup`` / ``launcher_missing`` state in the UI — no silent
+        RetroDECK fallback.
         """
-        resolved: dict[int, EmulatorInvocation] = {}
+        invocations: dict[int, str] = {}
         for rom in roms:
             emulator = self._active_core.active_emulator_for_rom(rom["id"])
-            if emulator is not None:
-                resolved[rom["id"]] = emulator
-        return resolved
+            resolution = self._launch_resolver.resolve_for(rom, emulator, rom.get("platform_slug"))
+            if resolution.status == "ok":
+                invocations[rom["id"]] = resolution.launch_options
+        return invocations
 
     def _scan_installed_paths(self) -> dict[int, str]:
         """Read ``{rom_id: bake_path}`` for the whole installed library in one scan.
