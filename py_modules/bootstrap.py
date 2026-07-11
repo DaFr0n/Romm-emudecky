@@ -34,7 +34,7 @@ from adapters.plugin_metadata import PluginMetadataAdapter
 from adapters.repositories.unit_of_work import SqliteUnitOfWork
 from adapters.retroarch_config import RetroArchConfigAdapter
 from adapters.retroarch_core_info import RetroArchCoreInfoAdapter
-from adapters.retrodeck_paths import RetroDeckPathsAdapter
+from adapters.emudeck_paths import EmuDeckPathsAdapter
 from adapters.rom_files import RomFileAdapter
 from adapters.romm.http import RommHttpAdapter
 from adapters.romm.romm_api import RommApiAdapter
@@ -296,7 +296,7 @@ def bootstrap(
     # service config — the service cutover (#784) consumes it.
     uow_factory: UnitOfWorkFactory = functools.partial(SqliteUnitOfWork, db_path)
 
-    retrodeck_paths = RetroDeckPathsAdapter(user_home=user_home, logger=logger)
+    retrodeck_paths = EmuDeckPathsAdapter(user_home=user_home, logger=logger)
     retroarch_config = RetroArchConfigAdapter(user_home=user_home, logger=logger)
     retroarch_core_info = RetroArchCoreInfoAdapter(user_home=user_home, logger=logger)
     core_resolver = CoreResolver(

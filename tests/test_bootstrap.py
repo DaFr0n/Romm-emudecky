@@ -32,7 +32,7 @@ from fakes.fake_sgdb_artwork_cache import FakeSgdbArtworkCache
 from fakes.fake_unit_of_work import FakeUnitOfWorkFactory
 from fakes.system_time import FakeClock, FakeSleeper, FakeUuidGen
 
-from adapters.retrodeck_paths import RetroDeckPathsAdapter
+from adapters.emudeck_paths import EmuDeckPathsAdapter
 from adapters.romm.http import RommHttpAdapter
 from adapters.romm.romm_api import RommApiAdapter
 from adapters.steam_config import SteamConfigAdapter
@@ -88,7 +88,7 @@ class TestBootstrap:
     def test_returns_retrodeck_paths_adapter(self, tmp_path):
         """Bootstrap instantiates the RetroDECK paths adapter for the callbacks bundle."""
         result = _bootstrap_for(tmp_path)
-        assert isinstance(result.callbacks.retrodeck_paths, RetroDeckPathsAdapter)
+        assert isinstance(result.callbacks.retrodeck_paths, EmuDeckPathsAdapter)
 
     def test_returns_core_info_provider_on_adapters(self, tmp_path):
         """``core_info_provider`` (CoreResolver) is bundled with adapters, not callbacks.
