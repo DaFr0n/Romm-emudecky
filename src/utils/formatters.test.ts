@@ -1,0 +1,172 @@
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import {
+  formatBytes,
+  formatLastPlayed,
+  formatPlaytime,
+  formatTimestamp,
+  formatTimeAgo,
+  formatUninstallStatus,
+} from "./formatters";
+
+describe("formatBytes", () => {
+  it("returns empty string for null", () => {
+    expect(formatBytes(null)).toBe("");
+  });
+
+  it("formats values under 1 KB as 'N B'", () => {
+    expect(formatBytes(0)).toBe("0 B");
+    expect(formatBytes(512)).toBe("512 B");
+    expect(formatBytes(1023)).toBe("1023 B");
+  });
+
+  it("formats values under 1 MB as 'N.N KB'", () => {
+    expect(formatBytes(1024)).toBe("1.0 KB");
+    expect(formatBytes(2048)).toBe("2.0 KB");
+    expect(formatBytes(1024 * 1024 - 1)).toBe("1024.0 KB");
+  });
+
+  it("formats values under 1 GB as 'N.N MB'", () => {
+    expect(formatBytes(1024 * 1024)).toBe("1.0 MB");
+    expect(formatBytes(5 * 1024 * 1024)).toBe("5.0 MB");
+  });
+
+  it("formats values 1 GB and up as 'N.NN GB'", () => {
+    expect(formatBytes(1024 * 1024 * 1024)).toBe("1.00 GB");
+    expect(formatBytes(2.5 * 1024 * 1024 * 1024)).toBe("2.50 GB");
+  });
+});
+
+describe("formatTimestamp", () => {
+  it("returns 'unknown' for null", () => {
+    expect(formatTimestamp(null)).toBe("unknown");
+  });
+
+  it("formats a valid ISO timestamp as a locale string", () => {
+    const out = formatTimestamp("2025-06-15T12:34:56Z");
+    expect(out).toContain("Jun");
+    expect(out).not.toBe("unknown");
+  });
+
+  it("returns the original string when Date construction succeeds but produces Invalid Date", () => {
+    // toLocaleString on an Invalid Date returns "Invalid Date" — no throw, no
+    // fallback. This documents that branch; if behavior changes we want to know.
+    const out = formatTimestamp("not-a-date");
+    expect(out).toBe("Invalid Date");
+  });
+});
+
+describe("formatTimeAgo", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-06-15T12:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns null for an unparseable string", () => {
+    expect(formatTimeAgo("nope")).toBeNull();
+  });
+
+  it("returns 'Just now' for timestamps less than a minute old", () => {
+    expect(formatTimeAgo("2025-06-15T11:59:30Z")).toBe("Just now");
+  });
+
+  it("returns Xm ago for minutes", () => {
+    expect(formatTimeAgo("2025-06-15T11:45:00Z")).toBe("15m ago");
+  });
+
+  it("returns Xh ago for hours", () => {
+    expect(formatTimeAgo("2025-06-15T08:00:00Z")).toBe("4h ago");
+  });
+
+  it("returns Xd ago for days", () => {
+    expect(formatTimeAgo("2025-06-12T12:00:00Z")).toBe("3d ago");
+  });
+});
+
+describe("formatLastPlayed", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-06-15T12:00:00Z"));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("returns 'Never' for 0 or negative", () => {
+    expect(formatLastPlayed(0)).toBe("Never");
+    expect(formatLastPlayed(-1)).toBe("Never");
+  });
+
+  it("returns 'Today' for today's timestamp", () => {
+    const todayMidday = Math.floor(new Date("2025-06-15T10:00:00Z").getTime() / 1000);
+    expect(formatLastPlayed(todayMidday)).toBe("Today");
+  });
+
+  it("returns 'Yesterday' for one day ago", () => {
+    const yesterday = Math.floor(new Date("2025-06-14T10:00:00Z").getTime() / 1000);
+    expect(formatLastPlayed(yesterday)).toBe("Yesterday");
+  });
+
+  it("returns 'N days ago' for under a week", () => {
+    const threeDaysAgo = Math.floor(new Date("2025-06-12T10:00:00Z").getTime() / 1000);
+    expect(formatLastPlayed(threeDaysAgo)).toBe("3 days ago");
+  });
+
+  it("returns 'DD. Mon.' for same-year dates older than a week", () => {
+    const twoMonthsAgo = Math.floor(new Date("2025-04-10T10:00:00Z").getTime() / 1000);
+    expect(formatLastPlayed(twoMonthsAgo)).toBe("10. Apr.");
+  });
+
+  it("returns 'DD. Mon. YYYY' for prior-year dates", () => {
+    const lastYear = Math.floor(new Date("2024-08-20T10:00:00Z").getTime() / 1000);
+    expect(formatLastPlayed(lastYear)).toBe("20. Aug. 2024");
+  });
+});
+
+describe("formatPlaytime", () => {
+  it("returns 'None' for 0 or negative", () => {
+    expect(formatPlaytime(0)).toBe("None");
+    expect(formatPlaytime(-5)).toBe("None");
+  });
+
+  it("returns 'N Min' under an hour", () => {
+    expect(formatPlaytime(42)).toBe("42 Min");
+  });
+
+  it("returns '1 Hour' singular at exactly 60 minutes", () => {
+    expect(formatPlaytime(60)).toBe("1 Hour");
+  });
+
+  it("returns 'N Hours' plural for whole multiples", () => {
+    expect(formatPlaytime(120)).toBe("2 Hours");
+  });
+
+  it("returns 'Nh Mm' for non-whole hours", () => {
+    expect(formatPlaytime(125)).toBe("2h 5m");
+  });
+});
+
+describe("formatUninstallStatus", () => {
+  it("omits the suffix when there are no errors", () => {
+    expect(formatUninstallStatus(5, 0)).toBe("Removed 5 ROMs");
+  });
+
+  it("appends '(N errors)' when errors are present", () => {
+    expect(formatUninstallStatus(5, 2)).toBe("Removed 5 ROMs (2 errors)");
+  });
+
+  it("handles the all-failed case (zero removed, errors present)", () => {
+    expect(formatUninstallStatus(0, 3)).toBe("Removed 0 ROMs (3 errors)");
+  });
+
+  it("handles the empty edge case (zero removed, zero errors)", () => {
+    expect(formatUninstallStatus(0, 0)).toBe("Removed 0 ROMs");
+  });
+
+  it("renders a single error without pluralizing (suffix stays '(1 errors)')", () => {
+    // The label intentionally keeps the simple plural form; documenting that
+    // here so a future change is a conscious decision, not a drift.
+    expect(formatUninstallStatus(1, 1)).toBe("Removed 1 ROMs (1 errors)");
+  });
+});

@@ -1,0 +1,893 @@
+# Backend Architecture
+
+## Overview
+
+The Python backend follows **Cosmic Python** ("Architecture Patterns with Python") adapted for a single-user Decky
+plugin. Code is split into four layers with a strictly enforced dependency direction:
+
+- **`services/`** — orchestration. Business logic and the public callable surface.
+- **`adapters/`** — I/O. Everything that touches the network, the filesystem, the clock, or Steam.
+- **`domain/`** — pure compute. Functions in, values out; no I/O, no state mutation, no service/adapter imports.
+- **`lib/`** — cross-cutting utilities independent of every other layer.
+- **`models/`** — data shapes (TypedDicts, dataclasses) independent of every other layer.
+
+Services depend on **Protocols** (defined in `services/protocols/`), never on concrete adapter classes. Adapters
+implement those Protocols. `bootstrap.py` is the composition root — the only place where concrete adapters meet
+services. `main.py` owns the Decky lifecycle and the callable surface; it holds no business logic.
+
+```python
+class Plugin:
+    # No base classes — pure composition
+    # Owns: the Decky lifecycle (_main / _unload) and the callable surface
+    # Delegates: all business logic to services, all I/O to adapters
+```
+
+## Dependency Diagram
+
+```text
+main.py (Plugin — Decky lifecycle + callable routing)
+    ↓ calls
+bootstrap.py (composition root: bootstrap() builds adapters, wire_services() builds services)
+    ↓ creates
+┌─────────────────────────────────────────────────────────┐
+│ Adapters (own all I/O — implement Protocols)            │
+│   RommHttpAdapter / RommApiAdapter — RomM REST          │
+│   SteamConfigAdapter — Steam VDF, grid dir, Steam Input │
+│   SteamGridDbAdapter / SgdbArtworkCacheAdapter — SGDB   │
+│   PersistenceAdapter (+ persister adapters) — JSON I/O  │
+│   SqliteUnitOfWork (+ repository adapters) — SQLite I/O │
+│   CoverArtFileStore / DownloadFile                      │
+│   FirmwareFile / MigrationFile / RomFile / SaveFile     │
+│   RetroDeckPaths / RetroArchConfig / RetroArchCoreInfo  │
+│   CoreResolver (ES-DE es_systems.xml)                   │
+│   PlatformCoreReaderAdapter (settings platform_cores)   │
+│   SystemClock / SystemUuidGen / AsyncioSleeper          │
+│   HostnameAdapter / PathProbe / PluginMetadata          │
+└────────────────────────┬────────────────────────────────┘
+                         │ injected via *ServiceConfig
+┌────────────────────────▼────────────────────────────────┐
+│ Services (depend on Protocols, not concrete adapters)   │
+│   LibraryService        SaveService                     │
+│   DownloadService       PlaytimeService                 │
+│   FirmwareService       SteamGridService                │
+│   MetadataService       AchievementsService             │
+│   MigrationService      GameDetailService               │
+│   ArtworkService        RomRemovalService               │
+│   ShortcutRemovalService  SettingsService               │
+│   CoreService           ConnectionService               │
+│   StartupHealingService LaunchGateService               │
+│   SessionLifecycleService                               │
+└────────────────────────┬────────────────────────────────┘
+                         │ depend on
+┌────────────────────────▼────────────────────────────────┐
+│ Protocols (services/protocols/) — grouped topically:    │
+│   transport / determinism / persistence / paths /       │
+│   infra / files / cross_service                         │
+└─────────────────────────────────────────────────────────┘
+
+Domain (domain/) — pure compute, imported by services and adapters; imports nothing above it.
+```
+
+Arrow direction: depends-on (A -> B means A uses B).
+
+## The `XxxServiceConfig` constructor pattern
+
+Every service takes a **single** `config` keyword argument — a frozen dataclass named `<ServiceName>Config`. All
+dependencies live in the config: Protocol-typed adapters, infrastructure seams (event loop, logger, `Clock`, `UuidGen`,
+`Sleeper`), persistence callbacks, and settings-derived values. There are no bare-param or mixed constructors.
+
+```python
+sync_service = LibraryService(
+    config=LibraryServiceConfig(
+        romm_api=...,           # Protocol-typed adapter
+        steam_config=...,       # Protocol-typed adapter
+        clock=...,              # Clock Protocol
+        uuid_gen=...,           # UuidGen Protocol
+        sleeper=...,            # Sleeper Protocol
+        uow_factory=...,        # UnitOfWorkFactory Protocol (roms / sync_runs / kv_config / rom_metadata)
+        artwork=...,            # cross-service Protocol-typed peer
+        # ...
+    ),
+)
+```
+
+Outer services keep the `Service` token in both names (`SteamGridService` + `SteamGridServiceConfig`). Sub-services may
+use role-based names without the token when it reads more naturally (`SyncEngine` + `SyncEngineConfig`,
+`SyncOrchestrator` + `SyncOrchestratorConfig`).
+
+## Module Responsibilities
+
+### Services (`py_modules/services/`)
+
+Two services are large enough to be decomposed into sub-service packages (`services/library/` and `services/saves/`);
+the rest are single modules. A service over ~700 LOC is the decomposition signal.
+
+| Module                    | Domain                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `library/`                | LibraryService façade — fetch ROMs, preview/apply sync, per-unit shortcut delivery, `roms`/`SyncRun` writes + queries (decomposed; see below)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `saves/`                  | SaveService aggregate — `.srm` upload/download, conflict detection, slots, versions (decomposed; see below)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `downloads.py`            | DownloadService — ZIP extraction, M3U, progress, bounded-concurrency download queue (Semaphore(2) + reserved-bytes pre-flight); cancel/cleanup never deletes a live install                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `firmware.py`             | FirmwareService — BIOS registry, downloads, per-core filtering; `get_firmware_status` ships per-platform `bios_level` (ok/partial/missing via `domain.bios.compute_bios_level`) + `required_count`/`required_downloaded`/`server_count`/`local_count` so the System page reads the decision off the payload (#461)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `session_lifecycle.py`    | SessionLifecycleService — post-exit orchestration (playtime + post-exit save sync + achievement sync + migration refresh)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `migration.py`            | MigrationService — RetroDECK path-change detection + file migration, save-sort change detection + conflict resolution. A home changed _again_ before migrating accumulates a **pending-home set** (`_previous` + a `_hops` array) instead of overwriting the marker, and collection matches each tracked record by longest-prefix against every pending home, so files under an intermediate home are never stranded ([#1042](https://github.com/danielcopper/decky-romm-sync/issues/1042); pure transition/remap kernel in `domain/migration_paths.py`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `steamgrid.py`            | SteamGridService — SteamGridDB fetch, cache, icons                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `artwork.py`              | ArtworkService — cover art download into the per-ROM cover cache (`{runtime}/covers/{rom_id}.png`, the single source of truth for a ROM's cover), publish of the active version's cache cover onto the Steam grid as `{app_id}p.png` (a **copy** so every sibling keeps its own file, ADR-0021 / #1346), the read-only `get_artwork_base64` query, the cache-first `fetch_cover_base64` used by the version picker (a cache miss downloads the ROM's cover from RomM — works for a server-only version with no local row), and cache/staging cleanup + startup orphan pruning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `game_detail.py`          | GameDetailService — game detail page data aggregation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `playtime.py`             | PlaytimeService — session recording into `rom_playtime` + the `rom_playtime_sessions` outbox, native play-session ingest (session-end fold+enqueue+flush to `/api/play-sessions` grouped per stored `device_id` with a bounded-retry quarantine + pull-only reconcile-on-view that restores `total_seconds`, `session_count`, and `last_played` via monotonic clamps, ADR-0018 / #903); owns the durable `kv_config["playtime_scope_notice"]` re-sign-in flag (a reconcile 403 sets it, a later 200 or a fresh sign-in clears it) surfaced via `get_playtime_scope_notice`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `achievements.py`         | AchievementsService — progress, caching, RA username                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `settings.py`             | SettingsService — settings reads/writes, Steam Input config                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `rom_removal.py`          | RomRemovalService — ROM file deletion + `rom_installs` cleanup via the UoW; keeps the `roms` row, playtime, and saves per ADR-0007                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `cores.py`                | CoreService — per-platform emulator-info lookup (`get_platform_core_info` — the classified `emulators` list + `emulator_data_available`), per-game core pin/clear (`roms.emulator_override`), per-platform core write (`settings.json` `platform_cores`) + fan-out re-bake; a pin's LABEL is validated against the bakeable options before any write and may name a standalone emulator or a libretro core; see [Core and Emulator Selection](core-emulator-selection.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `version_switch.py`       | VersionSwitchService — the game-detail version picker (ADR-0021). `get_version_list(app_id)` resolves the bound ROM's sibling group by `roms.sibling_group_key` (migration-010 index) and merges the local rows with RomM's live `get_rom(bound).sibling_roms` view — versions not yet synced are marked `synced: false`; returns each version's markers (`active` = the bound row, `is_default` = the resolution chain's pick with EMPTY install/binding filters, `installed`, and `switchable`) plus an additive `server_query_failed` flag when the server view can't be fetched. `switchable` is the SAME membership authority `switch_version` decides by (`domain.sibling_group.target_in_sibling_group`): a **local** target is a `sibling_group_key` match (the component keys encode membership, ADR-0022); a **server-only** target is judged by **canonical compatibility** — parse the bound key to `{source}:{value}` and require the target's id at that `source` to be **absent-or-equal** (the persisted key doubles as the group's canonical summary). A RomM sibling in a conflicting metadata match — a locally-synced ROM under a **different** `sibling_group_key` (#1359) or a never-synced ROM carrying a _different_ id at the bound canonical source (#1360) — is listed but `switchable: false` and dropped from the default ranking, so the picker disables the row instead of offering a switch the backend would reject with `not_in_group`. A `romm:` bound key (no metadata source) admits no server-only target; a target that merely _lacks_ the canonical id is in-group and adopts the bound group's key on switch (#1368 / ADR-0022). `switch_version(app_id, target_rom_id, allow_stranded)` (`@migration_blocked`) moves the group's binding to the target — a pure `roms` write (the repository's collision-unbind clears the old representative); no Steam call, no name change, no save migration (ADR-0021 §2/§4). Applies to **downloaded** games too (#1298): on success it returns `target_installed` + the target install's full `launch_options` (`""` for an uninstalled target, the ADR-0009 placeholder) which the frontend confirm-writes onto the sticky shortcut. Switching **away** from a downloaded version whose local saves drift is a **soft block** (`unsynced_saves`, carrying `server_reachable` / `unsynced_rom_id` / `unsynced_version_name`) so the picker can offer sync-first / switch-anyway / cancel; `allow_stranded=true` is the "Switch anyway" override, honoured even offline. Guards, each canonical `{success, reason, message}`: `not_found` / `download_in_progress` (any group member has an active download — cancel first) / `not_in_group` / `bound_elsewhere` / `unsynced_saves` (soft) / `server_unreachable` / `invalid_target` (a server-only target that is a sibling but whose RomM detail the `Rom` aggregate rejects). The drift + reachability probes run in their own short reads before any write UoW opens; the write UoW re-checks membership + bound-elsewhere (TOCTOU) and the relaunch resolver re-bakes the command outside it (both open their own UoW; ADR-0006). A server-only target is persisted from its RomM detail first via `domain.shortcut_data.extract_version_metadata`, adopting the **bound group's** `sibling_group_key` (not its own coalesce-first key) so the next sync re-canonicalizes the whole component together (ADR-0022) |
+| `active_core_resolver.py` | ActiveCoreResolver — the single per-ROM read seam: `active_core_for_rom(rom_id)` folds the per-game DB override + the per-platform `settings.json` core over the live-`es_systems.xml` system default (three layers: per-game override → per-platform core → live es_systems default → `None`, the plain launch; no bundled snapshot). Each layer resolves a LABEL to a bakeable `EmulatorInvocation` (libretro or standalone) via `get_emulator_options` / `label_to_invocation`. Every per-game core read + every launch bake draws from it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `shortcut_removal.py`     | ShortcutRemovalService — shortcut removal; unbinds the ROM in `roms` (keeps the row per ADR-0007)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `metadata.py`             | MetadataService — ROM metadata reads from `rom_metadata` (7-day TTL), app_id mapping                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `launch_gate.py`          | LaunchGateService — pre-launch gate (rom lookup, install check, save status)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `startup_healing.py`      | StartupHealingService — prunes stale `rom_installs` rows against disk on load (via the UoW) + reconciles orphaned `running` SyncRuns (a hard crash leaves a `running` row → marked errored) + `get_installed_relaunch_options()` builds the startup launch-options reconcile items (see [StartupHealingService notes](#startuphealingservice-notes))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `connection.py`           | ConnectionService — connection test + RomM minimum-version gate + Client API Token lifecycle (mint/establish via credentials, validate/store a user-pasted token, or exchange a short-lived pairing code for a token — the latter two for OIDC accounts; host-bound to the minting origin; see [ConnectionService notes](#connectionservice-notes))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `protocols/`              | Protocol interfaces grouped by concern (see [Protocol Interfaces](#protocol-interfaces))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+
+#### LibraryService decomposition (`services/library/`)
+
+The library sync subsystem is a façade over three sub-services that coordinate through a shared `LibrarySyncStateBox`:
+
+| Module                 | Role                                                                                                                                                                                                                             |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `service.py`           | `LibraryService` façade — public callable surface; wires the sub-services and delegates                                                                                                                                          |
+| `fetcher.py`           | `LibraryFetcher` — read-only RomM roundtrips: list platforms/collections, the incremental/full pagination loop, per-unit work-queue construction                                                                                 |
+| `sync_orchestrator.py` | `SyncOrchestrator` — preview (read-only), the per-unit apply pipeline, cancel, the heartbeat clock, progress emission                                                                                                            |
+| `reporter.py`          | `SyncReporter` — post-apply finalisation (artwork filenames, per-unit `roms` upsert + `SyncRun` lifecycle) and the `roms`-derived queries                                                                                        |
+| `_state.py`            | `LibrarySyncStateBox` — shared mutable in-flight sync state; single source of truth threaded through every sub-service, and the **sole owner** of the run-lifecycle pair (`sync_state` / `current_sync_id`) via its verb methods |
+
+The pipeline is split **fetch (read-only) / apply (owns persistence)**: the fetcher never mutates the `roms` registry or
+`rom_metadata`, and the reporter's per-unit commit upserts each acked ROM's `roms` row and stamps its cached
+`rom_metadata` in the same write Unit of Work (Rom row first, then metadata — FK-safe). So a preview never mutates
+state, and an interrupted apply leaves only the units it already committed — incremental, per-unit delivery.
+
+**Where the synced-ROM state lives.** The registry of synced ROMs, the last-sync timestamp, and the sync stats are
+SQLite, not JSON. The reporter upserts each acked ROM into the `roms` table via `Rom.synced(...)` / `update_cover_path`
+/ `assign_sgdb_id` (artwork and steamgrid patch `cover_path` / `sgdb_id` on the same aggregate during the per-unit
+commit) and, in the same write UoW, stamps the ROM's cached `rom_metadata` (`build_rom_metadata` maps the live RomM
+`metadatum` — Rom row saved first so the `rom_id` FK holds); the orchestrator drives the `SyncRun` lifecycle (`start` at
+apply-dispatch, `complete` / `mark_cancelled` / `mark_errored` at finalize). `sync_stats.roms` is a registry-derived
+bound-shortcut count computed at read time (the ROMs still bound to a shortcut in `roms`, i.e. `shortcut_app_id` not
+NULL), not a stored scalar. The old JSON `shortcut_registry` / `last_sync` / `sync_stats` are gone from this path; all
+writes go through the `roms` / `sync_runs` Repository Protocols behind a narrow Unit of Work (per
+[ADR-0006](https://github.com/danielcopper/decky-romm-sync/blob/main/docs/adr/0006-narrow-unit-of-work-scope.md) the UoW
+spans only the DB write, never the up-to-60s frontend ack). The platform `slug → display_name` map resolves live from
+RomM each sync and is cached in a `kv_config` row for offline reads. Removing a shortcut **unbinds** the ROM
+(`Rom.unbind_shortcut()` NULLs `shortcut_app_id`, keeping the row and its per-ROM children) rather than deleting it, per
+[ADR-0007](https://github.com/danielcopper/decky-romm-sync/blob/main/docs/adr/0007-rom-retention-identity-anchor.md).
+The full schema and aggregate model are in [Database Design](database-design.md).
+
+**Per-unit wait: timeout vs. cancel.** The orchestrator emits `sync_apply_unit`, then waits on `unit_complete_event`
+(heartbeat-clocked) for the frontend's `report_unit_results` ack. When the wait returns `None` the teardown branches on
+the cause (#1052):
+
+- **User cancel** (`is_cancelling()` already True at the return) — in-flight work is intentionally discarded: clear
+  `pending_sync`, null `unit_complete_event`. A stray late ack then no-ops.
+- **Heartbeat timeout** (still RUNNING) — the frontend has already created this unit's Steam shortcuts and will fire a
+  late `report_unit_results`. The orchestrator **keeps** `pending_sync` + `unit_complete_event`, flags `unit_abandoned`,
+  and stashes the unit's ROMs in `pending_unit_roms`, then flips CANCELLING so the loop stops.
+  `SyncReporter.report_unit_results` observes `unit_abandoned` and drives `commit_unit_results` **itself** (rebuilding
+  `acked_roms` from the stash so metadata is stamped too), persisting the delivered bindings instead of leaving orphan
+  shortcuts that the next sync re-creates as duplicates. The committed binding is mapped by the next sync's
+  existing-shortcut scan, so no active orphan deletion is needed (a Steam shortcut is the sole record of its tile).
+
+**Run/unit identity on the ack (#1041).** Every `sync_apply_unit` event carries the `run_id` (the run's
+`current_sync_id` UUID) and the `unit_id` (the `WorkUnit.id`); the frontend echoes both back on the
+`report_unit_results` ack. The orchestrator stamps the dispatched unit's id into `active_unit_id` just before it emits,
+and `report_unit_results` validates the ack against it: the `run_id` must match `current_sync_id` **and** the `unit_id`
+must match `active_unit_id` (both compared by string value, since a platform's id is numeric and a collection's is a
+string). An ack that fails the check — a **late ack from a cancelled run** arriving while a fresh run is in flight, or a
+stray ack for a different unit — is ignored (logged at debug, returns `{success: True, count: 0, ignored: True}`): it is
+neither recorded, signalled, nor committed, so it can never be credited to the wrong run/unit. `active_unit_id` survives
+the heartbeat-timeout abandon window (the same unit's late ack must still validate) and is cleared once the unit commits
+or is cancelled. On the frontend side, the unit handler **does not send the ack at all once cancel has been requested**
+— the first line of defence against a cancelled run's bindings landing in whatever run started next.
+
+**Run identity on the cancel (#1198).** `cancel_sync(run_id)` is run-scoped, mirroring the ack-path
+`_ack_matches_active_unit` check above. A Cancel click meant for run N can land after run N finalized to IDLE
+(`current_sync_id` nulled) and run N+1 started fresh — an unscoped cancel would flip run N+1 to CANCELLING (a sync the
+user never cancelled), which would abort it and report cancelled. So when the requested `run_id` is **truthy and does
+not match** `current_sync_id`, the cancel is **ignored** (logged at INFO, returns
+`{success: True, message: "Cancel
+ignored (stale run)"}`) — `sync_state` is left RUNNING. A matching id (or no active
+run) flips RUNNING → CANCELLING as before. A **falsy/`None`** `run_id` cancels **unconditionally** — legacy callers and
+the "no active run id captured yet" safety case — so cancel is never made less reliable. Every cancel logs one INFO line
+recording the requested `run_id`, the active `current_sync_id`, and the `sync_state` at call time. The frontend sources
+the run id from the backend-fed `sync_progress` store — its additive `runId` field (see below) — and passes it on the
+Cancel click; in the pre-run "Fetching library…" window the store's `runId` is still `""`, which maps to the
+unconditional cancel path rather than a stale prior-run id the backend would reject as a cross-run mismatch.
+`sync_cancel_preview` is **not** run-scoped: it only clears the pending preview delta (`pending_delta`), never touches
+`sync_state`, and `sync_apply_delta` independently validates the `preview_id`, so a stale preview-cancel cannot abort a
+fresh sync.
+
+**Group-aware sync — one Steam shortcut per sibling group
+([ADR-0021](https://github.com/danielcopper/decky-romm-sync/blob/main/docs/adr/0021-sibling-group-one-shortcut-binding-active-version.md)).**
+A game frequently exists in a RomM library as several dumps of the same title (region / language / revision variants).
+These share a **sibling group** (same `roms.sibling_group_key`, derived client-side by `domain/sibling_group.py`: a
+connected component over RomM's `sibling_roms` edges, keyed by the highest-priority metadata source the component agrees
+on — `compute_component_group_keys`, stamped onto the raw dicts before the shortcut build at both the preview and
+per-unit call sites, ADR-0022). The sync pipeline treats a group as one game = at most one **new** Steam shortcut; the
+sibling row holding `shortcut_app_id` is the group's **active version**.
+
+- **Persist all siblings, emit one shortcut per group.** The reporter's per-unit commit upserts a `roms` row (identity +
+  version metadata, via the sync UPSERT) for **every** fetched ROM of the unit, but only the group's representative
+  carries a Steam-shortcut binding — a non-representative sibling is a tracked, unbound row. Persisting the whole group
+  is what the version picker (#1297) and the incremental-skip gate need; binding only the representative is what stops
+  the same-named-collision and duplicate-shortcut bugs the ADR describes.
+- **The collapse happens at the same `build_shortcuts_data` boundary in both paths**
+  (`domain/sync_diff.py::collapse_sibling_groups`). Preview and apply build the full per-ROM shortcut list, then
+  collapse it to one entry per group against the bound-row registry (preview reads `_read_preview_baseline`, apply reads
+  `_read_apply_registry` per unit). The collapse takes an explicit `complete_group_view` flag: a sibling group is
+  per-platform, so the whole-library **preview** union and each **platform** apply unit see a group's whole membership
+  (`complete_group_view=True`) and collapse identically — the preview counts can never diverge from what those units
+  create (the #1292 counts-vs-reality bug class). A **collection** apply unit spans platforms and may fetch only one
+  unbound sibling of a group whose bound member it never fetched, so it is a **partial** view
+  (`complete_group_view=False`): a group that already holds a binding anywhere is grandfathered untouched — never
+  rebound onto the partial member, never given a second shortcut — because the group's real representative rides its own
+  platform unit in the same run. (Inferring "bound sibling absent ⇒ vanished" from a partial view would rebind a live
+  installed game onto an uninstalled sibling — #1296.) `classify_roms` runs over the collapsed set, so its new / changed
+  / unchanged / stale buckets count **games, not dumps**, and an unbound sibling stops reading as a perpetual "new".
+- **Resolution chain** (`domain/sibling_resolution.py::resolve_group_representative`, total + shuffle-stable): an
+  installed sibling wins; else an existing binding; else RomM's per-user default (`is_main_sibling`); else the **1G1R
+  ranking** — prerelease demotion > **region priority** > revision (newest) > alphabetical `fs_name_no_ext` > `rom_id`.
+  The first three legs are membership filters; the rest are the total order applied inside the surviving leg.
+  **Prerelease demotion** ranks first: a member whose structured `tags` name a draft build (Alpha / Beta / Proto /
+  Sample / Demo, case-insensitive, tolerant of a trailing number; `Unl` / `Aftermarket` / unknown tags are neutral) is
+  demoted below every retail sibling **across regions**, so a finished `(Japan)` release beats a `(USA) (Beta)`.
+  **Revision** ranks just after region: within one region the newest `revision` wins (natural compare; base dump =
+  lowest), but never lifts a lower-ranked region (a `(USA)` base still beats a `(Europe) (Rev 9)`). The alphabetical leg
+  also keeps a base dump ahead of a filename-only re-dump (`(Virtual Console)`, `(Extended Edition)`) RomM does not
+  parse into a tag. Region priority ranks a version by its best `regions` entry against a **fixed** build-time order —
+  `World > USA > Europe > Japan`, every other named region after these (alphabetically), a no-region version last (a
+  fixed constant, **not** language/system detection) — which the user may re-head with a single `preferred_region`
+  setting (`"auto"` = the fixed order; any other value lifts that region to the top). The leg is evaluated at resolution
+  time, so the setting takes effect on the next sync and an existing binding shields its group (the installed/binding
+  legs win before region priority is consulted). Used wherever one version must be chosen (a new group's shortcut, a
+  rebind's target). The QAM dropdown that sets `preferred_region` is populated from fixed anchors (Default, World, USA,
+  Europe, Japan) plus the distinct regions read from the local library (`get_known_regions` over `roms.regions` — no
+  server call), and a confirmation modal states the apply-at-next-sync / no-rename semantics before persisting.
+- **Canonical name at mint** (`domain/sibling_resolution.py::canonical_group_name`): a NEW group's shortcut is **named**
+  after the member ranked first by the _pure_ order (prerelease demotion > region priority > revision > alphabetical >
+  `rom_id`), ignoring the installed/binding/default filters — so a Japanese default still binds Japan but the shortcut
+  carries the USA name (never majority voting: two Japan dumps + one USA yields the USA name). This is mint-time only:
+  the name is sticky forever after (ADR-0021 §2), so a rebind/grandfathered entry carries the persisted bound name
+  verbatim and a live shortcut is never renamed. The appId is minted from the canonical name by the frontend
+  `AddShortcut`; the DB binding lands on the representative `rom_id`; the reporter is agnostic to the name↔rom mismatch
+  (it binds on `rom_id` + the acked appId, and persists each sibling's own RomM name from `pending_all_roms`).
+  `preferred_region` is read from settings by `sync_orchestrator` and threaded into every collapse call site (preview +
+  apply) as the same value within a run.
+- **Rebind, not remove.** When every bound sibling of a group vanishes from the server but the group still has fetched
+  members — and the collapse sees the group's whole membership (a platform unit or the preview,
+  `complete_group_view=True`; a partial collection view never rebinds) — it emits one **rebind entry** keyed to the
+  vanished sibling's `rom_id` (so the frontend reuses its existing shortcut through the `rom_id → appId` map — no
+  delete + recreate churn), carrying the representative's launch bake and a `bind_rom_id` marker. The commit translates
+  the ack through `bind_rom_id`, so the DB binding moves onto the representative; the collision-safe `Rom` save then
+  unbinds the vanished row. The shortcut's appId, artwork, collections and playtime all survive — only the active
+  version changes. A whole-group disappearance still routes through the normal stale path, and the #1036 committed-appId
+  guard is unchanged (the reused appId is committed this run, so it is never emitted for removal).
+- **Grandfathering.** A group that already carries several bound shortcuts (a library synced before this model) keeps
+  them all — each surviving bound sibling stays its own tracked shortcut; no new shortcut is minted for a group with a
+  binding. Convergence to one-shortcut-per-group happens naturally as the user uninstalls duplicates.
+- **Downstream group semantics.** The incremental-skip gate compares RomM's platform `rom_count` against **all**
+  persisted rows for the platform (not just bound representatives), restoring skip parity on platforms with sibling
+  groups (a NULL `sibling_group_key` still forces a backfill full-fetch). Artwork downloads only for the emitted
+  representatives (+ grandfathered bound siblings), never eager sibling covers. Steam-collection membership resolves
+  each RomM collection `rom_id` with a **group fallback** — an unbound sibling maps to its group's bound sibling's appId
+  — so collecting or favouriting any version puts the game's single shortcut in the collection.
+
+**Single-owner run lifecycle (#1202).** The run-lifecycle pair — `sync_state` (idle/running/cancelling) and
+`current_sync_id` — is mutated **only** through four verb methods on `LibrarySyncStateBox`, never by direct field
+assignment from a sub-service. Confining those two writes to the box makes run admission, cancellation, and termination
+a single compare-and-swap on the plugin's one event loop, so a rapid Sync/Cancel can't interleave a stale terminal with
+a fresh run's start and leave a half-reset id:
+
+- `try_begin_run(run_id)` — the **admission guard**. Compare-and-swap: returns `False` (no state change) if a run is
+  already in flight, else flips IDLE → RUNNING and stamps `current_sync_id`. Every entry point (`start_sync`,
+  `sync_preview`, **`sync_apply_delta`**) goes through it, so an overlapping second Sync/Apply is rejected with
+  `{success: False, reason: "sync_in_progress"}` instead of beginning a concurrent run that would double the terminal
+  events. A rejected apply does **not** consume `pending_delta`, so the still-valid preview survives for the legitimate
+  apply.
+- `request_cancel(run_id)` — the run-scoped cancel routing (the #1198 / #1200 logic, centralized): `"no_sync"` when
+  idle, `"stale"` when a truthy `run_id` doesn't match the active run (cancel ignored, run left RUNNING), else flips to
+  CANCELLING. A falsy `run_id` cancels unconditionally. `cancel_sync` and `shutdown` delegate here.
+- `finish_run(run_id)` — the **terminal**. Compare-and-reset: resets to IDLE + nulls `current_sync_id` **only** if
+  `run_id` still owns the slot; a late, foreign, or doubled terminal is a no-op and can never null a fresher run. Every
+  exit path (success, cancel, error, zero-unit) of the apply pipeline and the preview funnels into one
+  `finally: box.finish_run(run_id)` per run — the scattered per-unit / reporter resets are gone.
+- `is_in_flight()` / `is_cancelling()` — read-only state probes for the per-unit loop and checkpoints.
+
+`sync_preview` adds a final cancel checkpoint **after** the unit loop, immediately before it stages `pending_delta`, so
+a cancel landing in that last window routes into the cancelled branch (`{success: False, reason: "cancelled"}`,
+`pending_delta` left `None`) rather than staging a delta the user already cancelled. The confinement is enforced by
+`scripts/check_sync_lifecycle_owner.py` (an AST gate that fails CI if `sync_state` / `current_sync_id` is assigned
+anywhere outside `_state.py`).
+
+**`sync_progress` carries `runId`.** Every `sync_progress` event (and the persisted `get_sync_status` snapshot) now
+includes an additive `runId: str` field — `str(current_sync_id or "")` — so the frontend reads the active run id from
+the authoritative backend store rather than minting or threading its own. The idle default snapshot carries `runId: ""`.
+
+The same `sync_plan` capture point also clears the frontend's per-run cancel flag (`_cancelRequested`). The per-unit
+handler resets that flag at its own start, but an incrementally-**skipped** unit never runs that handler, so a skip-only
+run could otherwise carry a stale cancel from a prior cancelled run; resetting once per run on `sync_plan` is the
+reliable reset.
+
+#### Save-sync serialization (device gate)
+
+Every save-sync run on the device passes through a single **device-level serialization gate** (`SaveSyncGate`, in
+`services/saves/sync_engine/_gate.py`). Only **one** save-sync run is in flight at a time per device: when a second
+trigger fires while one is running, it **queues** — it waits for the in-flight run to finish rather than running
+alongside it. An `asyncio.Lock` is the serializer/queue; the gate owns only the bounded-acquire discipline around it (no
+run-lifecycle state, no run ids, no cancellation — those are out of scope here).
+
+The wait is **bounded** so a stuck run never traps the launch path. Each of the four trigger methods on `SyncEngine`
+wraps its run body in `bounded_run(timeout=…)` with a per-trigger budget — `pre_launch_sync` (30 s), `post_exit_sync`
+(60 s), `sync_rom_saves` (15 s), `sync_all_saves` (60 s). If the gate can't be acquired within the budget the call
+returns its own fallthrough instead of blocking: the launch-path triggers (`pre_launch_sync` / `post_exit_sync`) return
+the `offline` shape (`reason: SERVER_UNREACHABLE`, additive `offline: True`) so the launch flow treats a busy gate like
+an unreachable server; the manual triggers (`sync_rom_saves` / `sync_all_saves`) return `reason: "sync_busy"`. The lock
+is never leaked on timeout — a timed-out acquire releases any photo-finish hold before raising.
+
+The gate sits **outside** the per-ROM lock (`SyncEngine.rom_lock(rom_id)`): the device gate admits one run at a time
+across the whole device, then each ROM still takes its own `rom_lock` for the read-mutate-write of its `RomSaveState`.
+The cheap stateless early-out (`is_save_sync_enabled()`) runs **before** the gate, so a disabled-feature call never
+queues behind an in-flight run just to report it's off.
+
+#### DownloadService notes
+
+RomM exposes three mutually exclusive file-layout flags on every ROM detail. They control how the server stores files
+and how the API serves them. The plugin maps each layout to a local on-disk path:
+
+| RomM flag                | RomM server layout                                                | What `fs_name` is   | Plugin local layout                                                                                     |
+| ------------------------ | ----------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------- |
+| `has_simple_single_file` | `roms/<platform>/<file>` — one file, flat                         | the filename        | flat in platform folder: `roms/<platform>/<file>`                                                       |
+| `has_nested_single_file` | `roms/<platform>/<folder>/<file>` — one file in a per-game folder | the **folder** name | flat in platform folder: `roms/<platform>/<file>`                                                       |
+| `has_multiple_files`     | per-game folder with multiple files (multi-disc, BIN+CUE, etc.)   | the ZIP/folder name | extracted into per-game subfolder named after the launch file: `roms/<platform>/<launch-file-name>/...` |
+
+**`has_nested_single_file` quirk**: `fs_name` is the parent folder name, not the filename. The actual filename with
+extension lives in `files[0].file_name`. The plugin reads from `files[0].file_name` so the downloaded ROM lands with the
+correct extension (e.g. `Game.chd`, not the extension-less folder name `Game`). A defensive helper falls back to
+`fs_name` and warns if `files` is empty or missing.
+
+**Why nested-single is flattened locally**: a nested-single-file ROM has no sidecars by definition — RomM would mark it
+`has_multiple_files` if any companion files existed. The parent folder adds no value at the local layer, so the plugin
+drops it and stores the ROM directly in the platform folder, matching the simple-single-file layout. Multi-file ROMs
+keep their per-game subfolder because they contain multiple related files that belong together.
+
+**Extract-vs-flat gate keys on `len(files) > 1`, not on `has_multiple_files`**: the plugin decides ZIP-extract vs
+single-file download with the `is_multi_file_download` helper (`domain/rom_files.py`), which returns
+`len(files) > 1 OR has_multiple_files`. This mirrors RomM's own download gate, which zips whenever the **total** file
+count is not exactly 1. RomM computes `has_multiple_files` from **top-level** files only, so the two counts disagree for
+a nested layout: a canonical Switch game (base file at the root plus `update/` and `dlc/` in subfolders) has exactly one
+top-level file (`has_multiple_files=False`, `has_nested_single_file=True`) yet more than one total file, so RomM serves
+a ZIP. Keying on `has_multiple_files` alone would take the single-file path and write the ZIP bytes verbatim into one
+unreadable `.nsp`. The boolean is kept as a defensive fallback for payloads that omit `files`; a genuine nested-single
+ROM has `len(files) == 1` and correctly stays on the flat single-file path.
+
+**ES-DE directory-collapse rename**: a multi-file ROM is extracted into a staging folder named after the **ROM's
+identity** — `fs_name_no_ext`, falling back to `splitext(fs_name)` (`resolve_extract_dir_name` in `domain/rom_files.py`)
+— **never** after `files[0]`. That distinction matters for a `has_nested_single_file` folder game served as a ZIP (a PS3
+title whose first listed file is an arbitrary inner asset like a music file): `resolve_local_file_name` returns that
+asset's name for the local _filename_, but the extract _directory_ must carry the game's identity or the whole install —
+launch `file_path`, `rom_dir`, and the folder-boot launch bake — inherits the wrong name. The staging folder is then
+renamed after the **detected launch file including its extension** (e.g. `Final Fantasy VII (USA).m3u/` containing
+`Final Fantasy VII (USA).m3u`). ES-DE only collapses a directory into a single game entry when the folder name matches
+the launch file's full name with extension; without the rename a multi-disc game shows in ES-DE as a folder plus loose
+disc files. The launch file is only known after extraction (an `.m3u` may be auto-generated — see below), so the rename
+happens last, after launch-file detection, via `es_de_collapse_rename` (`domain/rom_files.py`) + the
+`DownloadFileStore.move_dir` whole-directory move. On a name collision (target already exists) the rename is skipped and
+the staging folder is kept — never clobbered or merged. Existing installs from before this feature keep their old folder
+layout until re-downloaded.
+
+**Folder-boot launch target (PS3)**: for a PS3 folder game `detect_launch_file` picks the nested
+`…/PS3_GAME/USRDIR/EBOOT.BIN` as the install's `file_path` — the correct launch _file_ identity (save path, core, and
+displayed filename all derive from it). But RPCS3's directory-boot wants the game **folder**, not the EBOOT, so the
+baked `launch_options` carries the game directory instead. This is a bake-time path override (`folder_boot_root`,
+`domain/rom_files.py`) applied in the `DiscLaunchResolver` seam, never a `file_path` rewrite: `file_path` stays the
+EBOOT anchor while only the argument baked into the shortcut becomes the folder
+([ADR-0019](../adr/0019-folder-as-launch-target.md), see
+[Core and Emulator Selection](core-emulator-selection.md#folder-boot-launch-target)).
+
+**Folder-boot launch target (PS3)**: for a PS3 folder game `detect_launch_file` picks the nested
+`…/PS3_GAME/USRDIR/EBOOT.BIN` as the install's `file_path` — the correct launch _file_ identity (save path, core, and
+displayed filename all derive from it). But RPCS3's directory-boot wants the game **folder**, not the EBOOT, and
+RetroDECK's `run_game.sh` reinterprets a directory `%ROM%` as a "directory as a file" (`run_game.sh:63-67`) so it can
+never launch a bare folder. Two overrides fire together, both keyed on the same `folder_boot_root` fact and neither a
+`file_path` rewrite: the baked **path** becomes the game folder (`folder_boot_root`, `domain/rom_files.py`, in the
+`DiscLaunchResolver` seam), and the baked **invocation** becomes a **direct sandbox command** that bypasses
+`run_game.sh` — `flatpak run --command=<launcher> net.retrodeck.retrodeck <args> "<folder>"`, resolved in
+`ActiveCoreResolver.active_emulator_for_rom` (standalone + folder-boot install → `CoreResolver.resolve_sandbox_launcher`
+gives the `/app/…/component_launcher.sh` sandbox path → `EmulatorInvocation.direct`). `file_path` stays the EBOOT anchor
+([ADR-0019](../adr/0019-folder-as-launch-target.md), see
+[Core and Emulator Selection](core-emulator-selection.md#folder-boot-launch-target)). The multi-file download path also
+**suppresses M3U generation** and **heals a `.txt`-suffixed `PS3_DISC.SFB`** for a folder-boot dump (`domain`
+`folder_boot_layout_root` + `DownloadService._maybe_heal_ps3_sfb_io`).
+
+**M3U generation rule** (`needs_m3u` in `domain/rom_files.py`): a game-named `<fs_name_no_ext>.m3u` is auto-generated
+(when no `.m3u` already exists) for **multi-disc** ROMs — two or more disc files of any kind (`.cue`/`.chd`/`.iso`) — so
+the emulator can switch discs, **and** for **single-disc bin/cue** ROMs — exactly one `.cue` — so the extract dir is
+renamed after a game-named playlist rather than a generically-named cue (`disc1.cue/`). Single-disc `.chd`/`.iso` arrive
+as single-file downloads that never reach the extraction path, so they get no playlist.
+
+**M3U is platform-gated on ES-DE's own extension list** ([ADR-0013](../adr/0013-platform-gated-m3u-via-es-systems.md)).
+The file-count rule above only runs when the ROM's system actually supports `.m3u`. RomM bundles a platform-blind `.m3u`
+into the ZIP for **every** multi-file game, including cartridge systems (Switch `.nsp`, Xbox 360 `.iso`) whose emulators
+have no playlist concept — so an extension-only heuristic wrongly produced a `<Game>.m3u/` folder that never collapsed.
+The plugin now asks whether ES-DE lists `.m3u` as a supported extension for that system, read from the same
+`es_systems.xml` ES-DE uses to decide directory-collapse, via `CoreResolver.system_supports_m3u(system)` exposed through
+the `SystemM3uSupportFn` Protocol (`services/protocols/`) and threaded into `DownloadService` from bootstrap. When the
+answer is `False`, no `.m3u` is generated **and** the bundled one is never chosen as the launch file
+(`detect_launch_file` skips its `.m3u` preference), so selection falls through to the real game file and the folder is
+named `<Game>.nsp/` / `<Game>.iso/` instead. The capability crosses the service/domain seam as a plain `bool` — the
+domain functions (`needs_m3u`, `detect_launch_file`) take `m3u_supported`, never a system name or an adapter. The
+bundled `.m3u` is left inert on disk, never deleted. When `es_systems.xml` cannot be found the answer defaults to
+`False` (safe: a missing playlist only degrades disc-switching, a wrong one breaks the launch).
+
+Filesystem writes go through `DownloadFileAdapter`. ZIP extraction is ZIP-slip protected and streamed: `extract_zip`
+copies each member in chunks and reports byte progress through an optional callback, so a multi-file ROM emits
+`download_progress` frames with `status: "extracting"` (`bytes_downloaded`/`total_bytes` over the **uncompressed**
+total, `resumable: false`) after the transfer hits 100%. The frontend reuses the same event — no new event name — to
+switch the download button and QAM queue into the non-cancellable **Extracting…** phase. Single-file downloads never
+emit it.
+
+**Bounded concurrency + reserved-bytes pre-flight**: at most **two** ROMs transfer at once, gated by an
+`asyncio.Semaphore(2)` around the transfer + post-IO critical section. `start_download` enters the queue with status
+**`queued`** and reserves the download's required bytes in `_reserved_bytes[rom_id]`; `_do_download` flips the status to
+`downloading` only once it acquires the semaphore (emitting a `download_progress` `status: "queued"` frame first if it
+has to wait), and releases the reservation in its `finally`. The disk pre-flight accounts for siblings' outstanding
+reservations (`free_space - sum(reserved) < required`) so two concurrent downloads that each fit alone but not together
+can't both pass — the second is rejected with an `insufficient_space` failure.
+
+**Cancel reaches the UI and never destroys a live install**: cancelling a download emits a terminal `download_progress`
+`status: "cancelled"` frame so the frontend resets the button out of its downloading state (the cancel path used to be
+silent). Because executor threads run to completion regardless of cancellation, a cancel that **loses the race** to a
+just-committed install is reconciled (`_reconcile_post_io` awaits the in-flight post-IO future): if the install
+committed, the download is surfaced as **completed** (launch options baked, `download_complete` emitted) rather than
+torn down. `_cleanup_partial_download` removes **only** the transient transfer artifacts (`.zip.tmp` / `.tmp`) and, for
+a multi-file ROM that did **not** commit, the extract dir(s) this download created — it **never** deletes the bare
+`target_path`, so a re-download that fails mid-stream (or a cancel that lost the race) cannot destroy a pre-existing or
+just-committed install.
+
+**Sibling supersede — one downloaded version per group**
+([ADR-0021](https://github.com/danielcopper/decky-romm-sync/blob/main/docs/adr/0021-sibling-group-one-shortcut-binding-active-version.md)
+§4 amendment, #1298): before a download begins, `start_download` (and `resume_download`) strips any **other** installed
+member of the ROM's sibling group so a game keeps at most one copy on disk. `_conflicting_sibling_install_ids` reads the
+group in one short UoW (indexed `iter_by_group_key`) and returns members that are installed **and** either unbound or
+bound to the _same_ shortcut — a member bound to a **different** shortcut (a grandfathered duplicate, ADR-0021 §5) is
+exempt and never removed. Each superseded install goes through the canonical `RomRemovalService.remove_rom` (files +
+`rom_installs` row; **saves untouched** per ADR-0007), the membership read UoW closed first so the removal's own UoW
+does not nest (ADR-0006); a `not_installed` result raced clean and is skipped, any other removal failure aborts the
+download so the invariant stays honest. A superseded sibling's _paused_ queue entry is evicted (`_evict_if_paused`) so a
+stale `.tmp` can't later resume into a second install. `resume_download` additionally refuses (`superseded`, entry
+dropped) when a switch has moved the group's binding to a different member since the pause — it won't re-download a
+version the picker has already left. The in-progress claim is taken before the supersede `await` and released on every
+early exit so a concurrent `start_download` for the same rom is rejected rather than racing past it.
+
+#### ConnectionService notes
+
+**The minimum-version gate is SemVer-aware on `SYSTEM.VERSION`.** `domain.version.meets_min_version` compares the
+numeric core against `_MIN_REQUIRED_VERSION`; when the core equals the floor, a `-alpha` / `-beta` suffix
+(case-insensitive, optional `.N` build number) ranks **below** the release and is rejected — so `4.9.0-beta.3` fails at
+floor `4.9.0` while `4.9.1-beta` passes. `development` and a missing version bypass the gate.
+
+**A Client API Token is bound to the server it was minted against.** When the token is minted, the canonical origin of
+`romm_url` (full `scheme://host[:port]`, default ports folded out, path/query dropped — `lib/url_host.normalize_origin`)
+is stored alongside it as `romm_api_token_origin`. `RommHttpAdapter.auth_header()` attaches the bearer **only** when
+that stored origin matches the current `romm_url` origin; on a mismatch it raises `TokenHostMismatchError` instead of
+sending the credential to a host the token was not minted for. The error is non-retryable and maps to a `config_error`
+failure (`Your saved RomM login is for a different server. Sign in again to continue.`), so every data flow fails fast
+until the user re-signs-in. `https://h` and `http://h` are deliberately **different** origins — a plaintext downgrade is
+a different destination, not the same one. A legacy token minted before origin stamping carries
+`romm_api_token_origin =
+None` and is treated as un-bound: it is still attached (never blocked) so existing installs
+keep working until their next sign-in stamps the origin.
+
+**Sign-in ordering: validate → probe → mint → persist (one atomic save).** `establish_token` trims the entered URL and
+rejects a non-http(s) value before any network call. It then holds the candidate URL in memory only — clearing the
+stored token in memory first so the version probe never carries the old server's bearer to the candidate host — and
+persists nothing until the mint succeeds. On any failure (probe unreachable, version too old, forbidden/error mint, no
+usable token, or a disk error) the in-memory auth state is rolled back to the previous working URL + token, and because
+disk was never touched the prior working credentials survive a failed sign-in. Only a successful mint commits
+`romm_url` + SSL flag + token + id + origin to disk in a single `save_settings()` call.
+
+**The old-token DELETE is origin-guarded and provenance-guarded.** RomM scopes a Client API Token to the account, and
+re-auth deletes the device's previous token. That DELETE is only fired when the old token's stored origin matches the
+new URL's origin (same-server re-auth) — replaying it against a different server would delete an unrelated token there,
+so the DELETE is skipped (and logged) when the origins differ or the old origin is unknown. It is **also** skipped
+whenever the previous token's `romm_api_token_source` is `"user"`: a token the user pasted belongs to the user, not to
+this device, and must never be revoked by the plugin (a user token also carries no `romm_api_token_id`, so there is
+nothing to DELETE by anyway — the source check states the intent). The DELETE uses Basic auth from the one-time
+credentials, unaffected by the cleared bearer.
+
+**A token's provenance is recorded in `romm_api_token_source`.** The value is `"minted"` for a token the plugin minted
+from a username/password (`establish_token` and the startup `migrate_legacy_credentials`) and `"user"` for a token the
+user pasted (`establish_user_token`). It is part of the snapshot/restore auth-state set, so a failed sign-in rolls it
+back with the rest of the auth state. Settings migration `v9 → v10` seeds it — `"minted"` when a token already exists (a
+pre-v10 install could only hold minted tokens), else `None`.
+
+**Pasted-token sign-in (`establish_user_token`) — the OIDC path.** OIDC / SSO accounts have no password to mint from, so
+the user creates a Client API Token in RomM's web UI and pastes it. `establish_user_token` mirrors `establish_token`'s
+validate → probe → gate → validate → persist-on-success-only shape, but the credential is the pasted token rather than a
+fresh mint, so there is **no** mint and **no** server-side DELETE of any prior token. The entered URL is trimmed and
+rejected if non-http(s); a blank/whitespace token is rejected as `config_error` before any network call. The candidate
+URL and the pasted token are held in memory only, with `romm_api_token_origin` stamped to the candidate origin and
+`romm_api_token_source = "user"`, so the auth-header guard attaches **this** token (not the old server's bearer) to the
+validation probe. Validation is an authenticated `GET /api/users/me`: a 401 means the token is invalid or revoked, a 403
+means it authenticates but lacks a required scope (the plugin cannot introspect a token's granted scopes, since
+`/api/users/me`'s `oauth_scopes` reflects the user's role, not the token's grants, so this connect-time authenticated
+probe is the only validation). Both map to the canonical `auth_failed` failure with a token-specific message. On any
+failure the in-memory auth state is rolled back and disk is never touched; only a successful validation commits URL +
+SSL flag + token + `id = None` + origin + source in a single `save_settings()`. The token value is never logged. The
+device-forget-on-origin-change and playtime-scope-notice clear run on the success path exactly as they do for
+`establish_token`. The `/api/users/me` validation + persist tail is shared with the paired-token path below via the
+private `_validate_and_persist_user_token` helper (both hand the plugin a token to validate and store with `"user"`
+provenance), so their observable behaviour stays identical.
+
+**Pairing-code sign-in (`establish_paired_token`) — the OIDC path without pasting.** The same OIDC accounts can sign in
+by entering a short-lived RomM pairing code instead of pasting the token: the plugin exchanges the code for the token
+over the **public, unauthenticated** `POST /api/client-tokens/exchange` endpoint (the one-time code is itself the
+credential). It mirrors `establish_user_token`'s validate URL → probe version → gate → obtain-credential → validate via
+`/api/users/me` → persist-on-success-only shape, but the credential is fetched by the exchange rather than pasted, and
+the exchange runs with the token trio **cleared** in memory (like `establish_token`) so no old bearer leaks to the
+candidate host during the unauthenticated call. The code is normalized the way RomM normalizes it — all whitespace and
+`-` stripped, then uppercased (`"ab-cd ef23"` → `"ABCDEF23"`) — and a code that is blank after normalization is a
+`config_error` before any network call. The exchange is **never auto-retried**: a pairing code is single-use, and a
+replay would burn both the code and RomM's per-client rate limit, so the transport's `unauthenticated_post_json` skips
+`with_retry`. Each RomM rejection maps to a distinct, actionable message: an invalid/expired/used code, a
+token-no-longer-exists 404, and a disabled-owner 403 all carry `auth_failed`; a 429 carries the bespoke `rate_limited`
+reason. On success the freshly rotated `raw_token` (the exchange regenerates the token server-side, so any previously
+copied raw value stops working) is host-bound in memory and run through the shared `_validate_and_persist_user_token`
+tail, so it is persisted with `"user"` provenance and `id = None` exactly like a pasted token — no mint, no server-side
+DELETE. The pairing code and the returned token are never logged.
+
+**The registered device id is forgotten on an origin change.** A device registered with RomM (`POST /api/devices`, its
+id stored in `kv_config["device_id"]`) is bound to the server it was registered against — RomM's `negotiate` save-sync
+transport hard-404s a foreign device id. So a successful sign-in whose origin differs from the previous token's origin
+forgets the stored device id (`SaveService.forget_device` → `DeviceRegistry.forget_device`, wired as the
+`DeviceForgetFn` injected into `ConnectionService`), so the next save-sync run re-registers against the new server. It
+reuses the same origin comparison as the old-token DELETE, but in the opposite sense — forget when the origins differ or
+the old origin is unknown. The forget is **local-only** (the row on the old server is left for RomM's machine-id dedup
+to reconcile on a later re-registration) and **best-effort on the success path** — a failed local clear never turns a
+good sign-in into a failure, and a failed sign-in (in-memory snapshot restored) keeps the still-current server's id.
+This is Phase 0a of the RomM Device Sync negotiate adoption
+([ADR-0016](../adr/0016-save-sync-hands-detection-to-romm-negotiate.md)).
+
+The no-sign-in URL change path (`SettingsService.save_server_url`) deliberately does not touch the token, so pointing
+the URL at a different origin leaves the stored token's origin mismatched and the auth-header guard makes subsequent
+data flows fail fast with `config_error` until the user signs in again. Because every data flow (including device
+registration) is inert until that sign-in, a stale device id from this path cannot be used before the sign-in clears it.
+
+**Sign-out (`sign_out`) is a local forget — never a server-side delete.** `sign_out` clears the token quad
+(`romm_api_token` / `romm_api_token_id` / `romm_api_token_origin` / `romm_api_token_source`) in the in-memory settings
+dict and persists them in a **single** `save_settings()` (the same atomic-write funnel `_persist_token` uses), keeping
+`romm_url` and the SSL flag so the user need not re-enter them. It mirrors the sign-in paths' persist discipline: the
+auth state is snapshotted first, and a failed save rolls the in-memory quad back to the snapshot and returns the
+canonical failure shape (via `error_response`), so a disk error never strands the user with a half-forgotten but
+still-valid token. Only on a **successful** save does it drop the cached RomM server version (`set_version(None)`) so no
+stale value lingers. It is synchronous — no `run_in_executor`, no network — and idempotent (signing out when already
+signed out still returns success). It **never** issues the server-side token DELETE: a minted token deliberately lacks
+`me.write` (deleting it would require re-entering the password, which sign-out does not have), and a user-supplied token
+belongs to the user. That is why the direct re-authentication path stays as **Sign in again** (not sign-out-then-in):
+`establish_token`'s same-origin minted-token cleanup (#1038) only fires while the old token id is still stored, so
+signing out first would strand the old minted token on RomM (which caps tokens per user). After sign-out,
+`test_connection` returns the canonical "Not signed in" `config_error` because `romm_url` survives but the token is
+gone. Signing out (like re-signing-in) while a sync or download is in flight needs no guard: once the token is gone the
+in-flight operation simply fails authentication and surfaces its normal error — deliberate, not a race to defend.
+
+**Server-supplied paths are validated, fail-stop on traversal**: every server-supplied path component — the firmware
+`file_name`, the ROM platform slug, and post-extraction URL-decoded ZIP member names — is checked through
+`lib/path_safety` (`safe_join` for realpath containment, `safe_path_component` for single-component names) before any
+write. A traversal attempt (`../`, an absolute path, or a `%2e%2e%2f`-encoded ZIP member that decodes to `../` after the
+pre-decode ZIP-slip check passes) **aborts the whole download** rather than skipping the offending entry:
+already-extracted members are cleaned up (no half-installed ROM), a canonical
+`{"success": false, "reason": "path_traversal", "message": ...}` failure is returned, and the `download_failed` event
+fires so the UI doesn't hang on "downloading". Firmware downloads surface the same canonical failure from
+`download_firmware`.
+
+#### StartupHealingService notes
+
+Beyond the disk-prune and orphaned-`SyncRun` reconciliation, this service owns the **startup launch-options reconcile**
+(#1043). `launch_options` (the full Steam-shortcut launch command) is written only event-driven — at sync, at
+download-complete, and on RetroDECK-home migration (ADR-0009) — so any path that misses its bake leaves an installed
+shortcut stuck on the `""` placeholder, and `bin/rom-launcher` then runs with no args and exits non-zero. There was no
+backstop short of a Force Full Sync or uninstall/reinstall.
+
+`get_installed_relaunch_options()` is the read half of the fix: a 0-arg read that returns `[{app_id, launch_options}]`
+for every ROM that is both **installed** (has a `rom_installs` row) and **bound** (its `roms.shortcut_app_id` is set).
+It snapshots the install/ROM rows in one short read UoW, then re-bakes each command **outside** that UoW through the
+same `active_core` / `disc_resolver` seams every other bake site uses — resolving inside the iteration UoW would
+deadlock, since `ActiveCoreResolver.active_core_for_rom` opens its own UoW (the per-connection write lock is not
+re-entrant). Uninstalled and unbound ROMs are skipped by construction. The callable is read-only and **not**
+migration-gated.
+
+The frontend pulls this on mount, once the backend is proven reachable (it reuses the app-id/metadata init's
+retry/backoff, not a second loop), and confirm-sets each entry via the existing `setLaunchOptionsConfirmed`
+fire-then-poll. The pass is **idempotent and appId-safe**: re-confirming a correct command matches the read-back
+instantly, and `launch_options` is not part of the appId CRC32, so artwork, collections, and the shortcut identity
+survive. This heals drift from every cause at the next plugin load.
+
+### Adapters (`py_modules/adapters/`)
+
+Adapters own all I/O and implement the Protocols defined in `services/protocols/`. Selected adapters:
+
+| Module                                                                     | Role                                                                                                                                                                          |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `romm/http.py`                                                             | `RommHttpAdapter` — HTTP transport: auth, SSL, retry, User-Agent, platform map                                                                                                |
+| `romm/romm_api.py`                                                         | `RommApiAdapter` — RomM REST surface (saves, ROMs, platforms, firmware, devices, play-sessions) over the HTTP transport                                                       |
+| `steam_config.py`                                                          | `SteamConfigAdapter` — Steam VDF read/write, grid dir, shortcut icon write, Steam Input config                                                                                |
+| `steamgriddb.py`                                                           | `SteamGridDbAdapter` — SteamGridDB REST client                                                                                                                                |
+| `sgdb_artwork_cache.py`                                                    | `SgdbArtworkCacheAdapter` — on-disk SGDB artwork cache                                                                                                                        |
+| `cover_art_file_store.py`                                                  | `CoverArtFileStoreAdapter` — RomM cover art I/O across the per-ROM cover cache and the Steam grid dir (download, `copy_file` publish/seed, read, prune)                       |
+| `persistence.py`                                                           | `PersistenceAdapter` + per-domain persister adapters — `settings.json` read/write plus the one-time legacy `save_sync_state.json` read that feeds the bootstrap settings fold |
+| `repositories/`                                                            | `SqliteUnitOfWork` + per-aggregate repository adapters — SQLite I/O (the live persistence path; see [Database Design](database-design.md))                                    |
+| `sqlite_migrations.py`                                                     | `apply_migrations` — schema migration runner (`db/migrations/NNN_*.sql`, `PRAGMA user_version`)                                                                               |
+| `download_file.py`                                                         | `DownloadFileAdapter` — download filesystem                                                                                                                                   |
+| `firmware_file.py` / `migration_file.py` / `rom_files.py` / `save_file.py` | per-subtree filesystem adapters (BIOS, RetroDECK migration, ROM removal, local saves)                                                                                         |
+| `retrodeck_paths.py`                                                       | `RetroDeckPathsAdapter` — reads `retrodeck.json` for ROMs/saves/BIOS/home paths                                                                                               |
+| `retroarch_config.py`                                                      | `RetroArchConfigAdapter` — reads `retroarch.cfg` save-sort flags                                                                                                              |
+| `retroarch_core_info.py`                                                   | `RetroArchCoreInfoAdapter` — reads RetroArch `.info` files (`corename`, metadata)                                                                                             |
+| `es_de_config.py`                                                          | `CoreResolver` — ES-DE `es_systems.xml` (system-layer default core + available cores); the gamelist is no longer read or written                                              |
+| `system_clock.py` / `system_uuid_gen.py` / `asyncio_sleeper.py`            | concrete `Clock` / `UuidGen` / `Sleeper` seams                                                                                                                                |
+| `hostname.py` / `path_probe.py` / `plugin_metadata.py` / `debug_logger.py` | hostname, path-exists probe, `package.json` version reader, settings-aware debug logger                                                                                       |
+
+#### PersistenceAdapter notes
+
+- **File locking**: write methods acquire an exclusive `fcntl.flock` before touching the file, preventing concurrent
+  writes from corrupting state.
+- **Schema versioning**: every state file written includes a `version` field. On read, a mismatch causes the file to be
+  treated as absent (cache discarded, state reset to defaults) rather than loading incompatible data.
+- **Crash-safe atomic writes**: `settings.json` is written with the durable write-tmp → `fsync(tmp)` → `os.replace()` →
+  `fsync(dir)` recipe. The temp file's bytes are forced to disk **before** the rename, and the directory entry the
+  rename creates is forced to disk **after** it. This closes the power-loss window on the Steam Deck's ext4: without the
+  fsyncs, a crash after the rename but before the kernel flushed could leave a truncated or empty `settings.json` —
+  which boot rewrites every run, so the window recurred. The directory fsync is best-effort: on the rare filesystem that
+  rejects it, the error is logged at debug and swallowed (the content is already durable via the temp-file fsync).
+- **Corrupt-file quarantine (never silently factory-reset)**: a `FileNotFoundError` on read is a legitimate first run —
+  defaults are returned silently, no backup, no flag. An **unparseable** `settings.json` (a `JSONDecodeError`, e.g. a
+  truncated file from a prior crash) is the data-loss hazard: returning defaults silently would let the immediate
+  bootstrap save overwrite the corrupt file, wiping the user's RomM URL, API token, SGDB key, and platform/collection
+  selections with no trace. Instead the adapter logs the corruption loudly at error level, renames the unparseable file
+  aside to `settings.json.corrupt-<ts>` (the `<ts>` is the injected `Clock`'s epoch seconds — filesystem-safe), and sets
+  a transient in-memory `corrupt_reset` flag before returning defaults. If the backup rename itself fails (e.g.
+  permissions), the error is logged and defaults are still returned so boot never crashes. Bootstrap reads that
+  transient flag after migration and — before the immediate save — folds it into the settings dict as a **persistent**
+  `_settings_reset_notice` marker (`{"backed_up_to": <basename>}`), so it survives a plugin reload. The frontend reads
+  it via the non-consuming `get_settings_reset_notice` callable and surfaces a persistent notice — a QAM `PanelSection`
+  banner (with a **Dismiss** button) plus a game-detail `WarningCard` (informational; its copy points the user to the
+  QAM to dismiss) — **not a toast** — telling the user their settings were reset and where the backup landed so they can
+  re-enter the server URL and sign in. The marker is cleared **only by an explicit user acknowledgement**: the QAM
+  Dismiss button calls `dismiss_settings_reset_notice`, which pops `_settings_reset_notice` and persists; the frontend
+  clears the shared store on success so the banner and every game-detail card disappear at once. Sign-in does **not**
+  clear the notice — the user decides when they have read it.
+- **Version never down-stamps**: on write, the `version` field is stamped to `max(stored_version, _SETTINGS_VERSION)`. A
+  file written by a **newer** plugin (stored version > current) is preserved as-is rather than down-stamped, so a later
+  re-upgrade does not re-run migrations against down-stamped data. An absent or older version is stamped up to the
+  current `_SETTINGS_VERSION`.
+
+### Domain (`py_modules/domain/`)
+
+Domain modules contain pure logic with no I/O and no Decky imports. They take inputs and return outputs; anything
+stateless and I/O-free that would otherwise sit in a service lives here. Domain is stdlib + self only — it imports no
+other internal layer (`lib` and `models` included). Aggregate roots and the enforcement that keeps them honest are
+documented in [Database Design](database-design.md). Selected modules:
+
+| Module                                                                            | Role                                                                                                                                                                                                                                                                                                                           |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sync_action.py`                                                                  | `compute_sync_action` — the save-sync decision algorithm. Returns `SyncAction` union (`Skip` / `Upload` / `Download` / `Conflict`). See [Save File Sync Architecture](save-file-sync-architecture.md).                                                                                                                         |
+| `sync_diff.py`                                                                    | ROM classification and platform/collection diff computation for the sync preview                                                                                                                                                                                                                                               |
+| `preview_delta.py`                                                                | `PreviewDelta` shape for the sync preview                                                                                                                                                                                                                                                                                      |
+| `work_unit.py`                                                                    | `WorkUnit` — the per-unit sync work item                                                                                                                                                                                                                                                                                       |
+| `rom_save_state.py`                                                               | `RomSaveState` aggregate + `FileSyncState` value object — per-ROM save-sync state, backed by `rom_save_states` + `rom_save_files`                                                                                                                                                                                              |
+| `save_path.py` / `save_attribution.py` / `save_status*.py` / `save_extensions.py` | save path resolution, uploader attribution, status DTO building                                                                                                                                                                                                                                                                |
+| `firmware_paths.py` / `bios.py`                                                   | BIOS path computation and status formatting; `bios.py` holds the BIOS status dataclasses (`AvailableCore`, `BiosFileEntry`, `BiosStatus`) and owns the ok/partial/missing CLASSIFICATION boundary (`compute_bios_level` / `compute_bios_label`) — the single source of truth all surfaces read; phrasing + color stay UI-layer |
+| `iso_time.py`                                                                     | `parse_iso` / `parse_iso_to_epoch` — ISO-8601 timestamp parsing (stdlib only)                                                                                                                                                                                                                                                  |
+| `achievements.py`                                                                 | achievement progress computation                                                                                                                                                                                                                                                                                               |
+| `shortcut_data.py`                                                                | shortcut data building (registry entries, shortcut dicts)                                                                                                                                                                                                                                                                      |
+| `steam_categories.py`                                                             | Steam collection name computation                                                                                                                                                                                                                                                                                              |
+| `sgdb_artwork.py`                                                                 | SGDB asset-type/endpoint maps and `to_signed_app_id`                                                                                                                                                                                                                                                                           |
+| `installed_roms.py` / `rom_files.py`                                              | installed-ROM detection, M3U generation, launch-file detection                                                                                                                                                                                                                                                                 |
+| `retroarch_core_info.py`                                                          | `parse_core_info` — pure parser for RetroArch `.info` files                                                                                                                                                                                                                                                                    |
+| `state_migrations.py`                                                             | `migrate_settings` (`settings.json`) + `fold_legacy_save_sync_settings` (one-time legacy `save_sync_state.json` fold)                                                                                                                                                                                                          |
+| `sync_state.py`                                                                   | `SyncState` enum (idle, running, cancelling)                                                                                                                                                                                                                                                                                   |
+| `emulator_tag.py` / `version.py`                                                  | emulator-tag formatting, version parsing, core-change detection                                                                                                                                                                                                                                                                |
+
+**Config-source parsers** follow a dedicated domain+adapter template (pure parse in domain, I/O in adapter, callback
+Protocol into services). The full pattern, source catalog, and decisions log are on the
+[Config Source Parsers](config-source-parsers.md) page.
+
+### Models (`py_modules/models/`)
+
+TypedDicts and dataclasses describing on-disk and in-flight data shapes (`state.py`, `metadata.py`). Models import
+nothing from the other layers.
+
+### Other
+
+| File                 | Role                                                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `main.py`            | Plugin class — Decky lifecycle (`_main`/`_unload`) and the callable surface (one `async def` per `@callable`) |
+| `bootstrap.py`       | Composition root — `bootstrap()` builds adapters, `wire_services()` builds services                           |
+| `lib/errors.py`      | Exception hierarchy (`RommApiError`, `classify_error`)                                                        |
+| `lib/list_result.py` | `ErrorCode` and the canonical callable failure shape                                                          |
+
+## Composition Root (`bootstrap.py`)
+
+The composition root has two functions:
+
+1. **`bootstrap()`** — builds every adapter, applies the SQLite schema migrations, and loads + migrates `settings.json`
+   (folding in the one-time legacy `save_sync_state.json` settings) so the settings persister binds the live mutable
+   `settings` dict at construction. Returns a typed `BootstrapResult` carrying four bundles (`adapters`, `stores`,
+   `callbacks`, `runtime_adapters`) plus a small `handles` struct for Plugin-only outputs.
+
+2. **`wire_services()`** — takes a `WiringConfig` (the four bundles plus `min_required_version`) and constructs every
+   service, injecting each one's `*ServiceConfig`. Returns a dict of named service instances.
+
+The two-phase split exists because adapter instantiation and state loading happen first (`bootstrap()`), then `main.py`
+composes the runtime bundle (event loop, `decky.emit`) and calls `wire_services()`. Services receive the `settings` dict
+(the only field on `StateBundle`) plus the SQLite Unit-of-Work factory / repository handles for all relational state —
+no plural in-memory state dicts remain. Some services are constructed before others to satisfy ordering constraints
+(e.g. `MigrationService` before `SaveService` so save sync observes fresh save-sort state). Forward references between
+peers are threaded via `LateBinding`.
+
+Per the process-boundary rule, adapter instantiation never happens in `main.py`, and no service wiring happens in
+`bootstrap.py`'s caller other than via `wire_services()`.
+
+## Protocol Interfaces
+
+Services depend on Protocols, never on concrete adapter implementations. The Protocols live in the `services/protocols/`
+package, organised topically (consumers always deep-import `from services.protocols import X`):
+
+- **`transport`** — external system clients: `RommApi` (and its narrowed facets `RommSaveApi`, `RommRomReader`,
+  `RommDeviceApi`, `RommFirmwareApi`, `RommPlaytimeApi`, `RommLibraryApi`, `RommConnectionApi`, `RommPlatformReader`,
+  `RommAchievementsApi`, `RommSyncApi`, `RommVersion`), `SteamConfigStore`, `SteamGridDbApi`.
+- **`determinism`** — `Clock` / `UuidGen` / `Sleeper` test seams.
+- **`persistence`** — `SettingsPersister`, `PluginMetadataReader`.
+- **`paths`** — `RetroDeckPaths`, `SystemResolver`, `CoreInfoProvider`, `CoreResolverFn`, `CoreNameProviderFn`,
+  `RetroArchConfigReader`, `RetroArchCoreInfoReader`, `RetroArchSaveSortingProvider`, `PlatformCoreReader`.
+- **`infra`** — cross-cutting callable seams: `EventEmitter`, `DebugLogger`, `PathExistsReader`, `HostnameReader`,
+  `PendingSyncReader`, `DownloadQueueCleanup`.
+- **`files`** — filesystem seams: `CoverArtFileStore`, `DownloadFileStore`, `FirmwareFileStore`, `MigrationFileStore`,
+  `RomFileStore`, `SaveFileStore`, `SgdbArtworkCache`.
+- **`cross_service`** — narrowly-typed multi-method seams one service exposes to another so services stay independent:
+  `BiosChecker`, `AchievementsReader`, `ArtworkManager`, `ArtworkRemover`, `RetryStrategy`, `MigrationPendingFn`,
+  `SaveSortChangeFn`, `DeviceForgetFn`, `DeviceIdProvider` (server device id, `SaveService.get_device_id` →
+  PlaytimeService), `PlaytimeScopeNoticeClearFn` (PlaytimeService clears its re-sign-in notice on a fresh sign-in from
+  ConnectionService), the `LaunchGate*` and `Session*` seams.
+
+Protocol names carry a suffix that signals shape (`…Reader`, `…Provider`/`…Fn`, `…Store`, `…Cache`, `…Persister`; bare
+names for pervasive primitives like `Clock`).
+
+`RommApiAdapter` implements `RommApi` over `RommHttpAdapter`, targeting RomM 4.9.0+ endpoints.
+
+## Boundary Enforcement
+
+Four CI-gated layers keep the dependency direction and the call-site rules from drifting. Aggregate-specific enforcement
+(the `@cosmic_aggregate` decorator and the field-assignment check) is documented in
+[Database Design](database-design.md).
+
+### 1. import-linter (CI-enforced)
+
+`.importlinter` declares the layer contracts:
+
+```ini
+# Services must not import concrete adapter implementations (Protocols OK)
+[importlinter:contract:no-adapter-impl-in-services]
+type = forbidden
+source_modules = services
+forbidden_modules = adapters
+
+# Adapters must not import services
+[importlinter:contract:no-services-in-adapters]
+type = forbidden
+source_modules = adapters
+forbidden_modules = services
+
+# Utilities (lib/) must not import services, adapters, or domain
+[importlinter:contract:utilities-independence]
+type = forbidden
+source_modules = lib
+forbidden_modules = services, adapters, domain
+
+# Domain is pure compute — no dependency on any other internal layer
+[importlinter:contract:domain-independence]
+type = forbidden
+source_modules = domain
+forbidden_modules = services, adapters, lib, models
+
+# Domain is stdlib + self only — no vendored third-party packages
+[importlinter:contract:domain-stdlib-only]
+type = forbidden
+source_modules = domain
+forbidden_modules = _vendor
+
+# Models must not import services, adapters, domain, or lib
+[importlinter:contract:models-independence]
+type = forbidden
+source_modules = models
+forbidden_modules = services, adapters, domain, lib
+
+# Services must not import stdlib I/O / non-deterministic primitives directly
+[importlinter:contract:no-stdlib-io-in-services]
+type = forbidden
+source_modules = services
+forbidden_modules = random, subprocess, threading, requests, time, uuid
+
+# Services must be independent of each other
+[importlinter:contract:service-independence]
+type = independence
+modules = services.library, services.saves, services.playtime, ...
+```
+
+Run with `PYTHONPATH=py_modules lint-imports` (or `mise run lint`). CI gates on this.
+
+The `service-independence` `modules` list is hand-enumerated, so `scripts/check_service_independence_contract.py`
+(bundled into `mise run lint` and gated in CI) derives the expected services from `py_modules/services/` and fails if
+the contract omits a service or carries a stale entry — keeping the list self-healing rather than silently rotting.
+
+### 2. Cosmic Python call bans
+
+`scripts/check_cosmic_call_bans.sh` (also bundled into `mise run lint`) complements the import-level guardrail at the
+call site: services may not call `datetime.now()` / `asyncio.sleep()` / `time.time()` / `time.monotonic()` /
+`uuid.uuid4()` / `random.*` directly — they inject the corresponding `Clock` / `Sleeper` / `UuidGen` Protocol instead.
+
+### 3. Aggregate field-assignment check
+
+`scripts/check_aggregate_field_assignment.py` (also bundled into `mise run lint`) is a small custom AST linter that
+enforces the **mutation-only-via-methods** rule for aggregates — a rule no type checker can express directly. It
+collects the class names decorated with `@cosmic_aggregate` in `domain/` (currently the 8 aggregate roots), then scans
+`services/` for `<aggregate>.<field> = ...` assignments and fails CI on any it finds. The escape hatch is a trailing
+`# pragma: no aggregate-check` on the offending line. Full detail in [Database Design](database-design.md).
+
+### 4. Failure-shape dialect gate
+
+`scripts/check_failure_shape.py --check` (also bundled into `mise run lint`) is a small custom AST linter that enforces
+the **canonical failure shape** for dict-returning callables — every `success: False` return in `services/` must carry
+both `reason` and `message` and must not carry the legacy `error_code` key or a second `error` key. It collapses the
+three dialects that previously coexisted (`error_code`, `error`, and slug-less ad-hoc dicts) onto one vocabulary. The
+two documented carve-outs (discriminated-status unions — a `status` key with no `success`; and partial-success payloads
+carrying an additive `server_query_failed` / `recommended_action` flag) are pattern-exempt. Run without `--check` for
+the report-mode inventory grouped by classification. The routing slugs come from `lib.list_result.ErrorCode` (the Lean
+enum) plus bespoke plain-string reasons for non-server-reachability guards.
+
+### 5. Enforced: underscore prefix
+
+All internal methods use a `_` prefix; public callables (exposed to the frontend via `callable()`) have none. `main.py`
+callable methods delegate directly to the corresponding service method. Even synchronous callable bodies are `async def`
+— Decky's callable framework requires it.
+
+This is no longer just a convention — basedpyright enforces it with `reportPrivateUsage = "error"`, so accessing a
+`_`-prefixed name from outside its owning class is a hard type error. Tests are exempt via an `executionEnvironments`
+override (white-box testing — inspecting and rebinding a system-under-test's private state — is an accepted pattern).
+One corollary: a method one sub-service calls on a peer is part of that peer's **public** surface and carries no
+underscore, which keeps `reportPrivateUsage` coherent with the saves-style peer-injection carve-out.
+
+## Service Dependency Summary
+
+Every service receives its dependencies through a single `*ServiceConfig` dataclass. Cross-service dependencies are
+Protocol-typed (services never import each other's concrete classes). Selected wiring:
+
+| Service                     | Key injected dependencies                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **LibraryService**          | `RommLibraryApi`, `SteamConfigStore`, `ArtworkManager`, `Clock`/`UuidGen`/`Sleeper`, `SettingsPersister`, `UnitOfWorkFactory` (roms / sync_runs / kv_config / rom_metadata)                                                                                                                                                                                                                                                                                                                                  |
+| **MetadataService**         | `UnitOfWorkFactory` (reads `rom_metadata` / `roms`)                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **SaveService**             | `RommApi`, `RetryStrategy`, `SaveFileStore`, `UnitOfWorkFactory` (`rom_save_states` / `rom_save_files`), `Clock`, `RetroDeckPaths`, core-name/active-core providers, migration-detect callbacks                                                                                                                                                                                                                                                                                                              |
+| **DownloadService**         | `RommApi`, `DownloadFileStore`, `RetroDeckPaths`, `Clock`/`Sleeper`                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **FirmwareService**         | `RommApi`, `FirmwareFileStore`, `CoreInfoProvider`, `RetroDeckPaths`, `UnitOfWorkFactory` (`firmware_cache`)                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **SteamGridService**        | `SteamGridDbApi`, `RommApi`, `SteamConfigStore`, `SgdbArtworkCache`, `UnitOfWorkFactory` (sgdb_id on `roms`), `PendingSyncReader`                                                                                                                                                                                                                                                                                                                                                                            |
+| **MigrationService**        | `MigrationFileStore`, `RetroDeckPaths`, save-sort/active-core/core-name providers, BIOS-index callback                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **GameDetailService**       | `BiosChecker`, `AchievementsReader` (cross-service), `Clock`, `UnitOfWorkFactory` (one read UoW over `roms` / `rom_installs` / `rom_save_states` / `rom_metadata` / `kv_config`)                                                                                                                                                                                                                                                                                                                             |
+| **AchievementsService**     | `RommAchievementsApi`, `Clock`, `DebugLogger`, `UnitOfWorkFactory` (reads `ra_id` from `roms`)                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **SettingsService**         | `SteamConfigStore`, `SettingsPersister`, `UnitOfWorkFactory` (reads bound `shortcut_app_id`s from `roms`)                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **PlaytimeService**         | `RommPlaytimeApi`, `RetryStrategy`, `DeviceIdProvider` (server device id, satisfied by `SaveService.get_device_id`), `Clock`, `UnitOfWorkFactory` (reads/writes `rom_playtime` + `rom_playtime_sessions`, and the `kv_config` scope-notice flag). Exposes `clear_scope_notice` to ConnectionService (via `PlaytimeScopeNoticeClearFn`) so a fresh sign-in drops the re-sign-in notice                                                                                                                        |
+| **RomRemovalService**       | `RomFileStore`, `RetroDeckPaths`, `DownloadQueueCleanup` peer, `UnitOfWorkFactory` (reads/deletes `rom_installs`)                                                                                                                                                                                                                                                                                                                                                                                            |
+| **ShortcutRemovalService**  | `SteamConfigStore`, `ArtworkRemover` peer, `UnitOfWorkFactory` (unbinds via `roms`, offline name via `kv_config`)                                                                                                                                                                                                                                                                                                                                                                                            |
+| **SessionLifecycleService** | `Session*` cross-service seams (playtime / post-exit sync / achievement sync / migration reader)                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **LaunchGateService**       | `LaunchGateRomLookup`, `LaunchGateInstalledChecker`, `LaunchGateSaveStatusReader` cross-service seams                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **ConnectionService**       | `RommConnectionApi`, `SettingsPersister`, `min_required_version`, `DeviceForgetFn` (cross-service — forgets the device id on an origin change), `PlaytimeScopeNoticeClearFn` (cross-service — clears the playtime re-sign-in notice on a fresh sign-in)                                                                                                                                                                                                                                                      |
+| **VersionSwitchService**    | `RommRomReader` (live `sibling_roms` view + per-sibling detail), `Clock`, `UnitOfWorkFactory` (resolves a sibling group via `iter_by_group_key` and moves its binding on `roms`), `settings` (reads `preferred_region` for the default-badge ranking), `SaveDriftProbeFn` + `ReachabilityProbeFn` (the switch-away save-stranding soft block), `RomRelaunchItemReader` (re-bakes a switched-onto install's `launch_options`), `ActiveDownloadRomIdsFn` (refuse a switch while a group member is downloading) |
+
+Most services also receive the `settings` dict (`StateBundle`'s only field), the runtime infrastructure (event loop,
+logger, the `DebugLogger` Protocol), and the `UnitOfWorkFactory` for relational state through their config. The old
+in-memory `state` / `metadata_cache` / `save_sync_state` / `shortcut_registry` dicts are gone — every relational
+read/write goes through the Unit of Work.

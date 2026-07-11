@@ -1,0 +1,267 @@
+# Development
+
+Guide for setting up a development environment and contributing to decky-romm-sync.
+
+## Prerequisites
+
+- [mise](https://mise.jdx.dev/) — manages Node, pnpm, and Python versions
+- Git
+- A Steam Deck or Linux PC with [Decky Loader](https://decky.xyz/) installed (for testing)
+
+> **On Windows, develop inside [WSL2](https://learn.microsoft.com/windows/wsl/install).** The plugin targets Linux —
+> some adapters import Unix-only modules (e.g. `fcntl`), a few dev dependencies have no Windows wheel, and CI runs on
+> Linux. Native Windows is not supported for running the test suite; in a WSL2 Linux distro the same `mise install` /
+> `mise run setup` / `mise run test` work unchanged.
+
+## Setup
+
+```bash
+git clone https://github.com/danielcopper/decky-romm-sync.git
+cd decky-romm-sync
+mise install          # installs Node LTS, pnpm, Python
+mise run setup        # installs JS + Python dependencies
+```
+
+This creates a Python virtual environment (auto-activated by mise via `_.python.venv` in `mise.toml`) and installs all
+npm packages.
+
+Python dependencies are installed from `requirements-dev.lock` — fully-pinned versions compiled from
+`requirements-dev.txt` by uv. After changing a source (`requirements-dev.txt` / `requirements-docs.txt`) or bumping a
+pin, run `mise run lock-update` to regenerate the locks.
+
+### Automated dependency updates
+
+Update PRs are managed by [Renovate](https://docs.renovatebot.com/) (`renovate.json`) across pip, npm, and GitHub
+Actions, and in-range minor/patch updates auto-merge once CI is green. For the full picture — **where every version
+lives, what's coupled, what auto-merges, and how to bump things by hand** — see
+[Dependency management](dependency-management.md).
+
+The toolchain versions — `node`, `pnpm`, `python`, `uv`, `deno` — are **excluded** from Renovate: they are pinned and
+cross-file-coupled (each appears in `mise.toml` and in `package.json`'s `packageManager` and/or the workflow `setup-*`
+version inputs, and all copies must match — `python` to Decky's embedded libpython3.11, `uv` for lock reproducibility).
+Renovate is disabled for these by dependency name so a bot bump can't desync one copy; bump them by hand, together. The
+`setup-*` action SHAs themselves stay auto-updated.
+
+## Building
+
+```bash
+pnpm build            # Rollup -> dist/index.js
+```
+
+The frontend is bundled with Rollup into a single `dist/index.js` file that Decky Loader serves.
+
+## Testing
+
+```bash
+python -m pytest tests/ -q     # run the backend test suite
+mise run test                   # same thing via mise
+```
+
+To run with coverage:
+
+```bash
+python -m pytest tests/ -q --cov=py_modules --cov=main --cov-report=term --cov-branch
+```
+
+Tests mirror the source layout (`tests/services/`, `tests/adapters/`, `tests/domain/`, `tests/models/`, `tests/lib/`),
+with each test file mapping 1:1 to a source module. Shared mocks live in `tests/conftest.py`, which also provides a mock
+`decky` module so tests run without Decky Loader.
+
+Frontend component tests run with `mise run test:frontend` (`pnpm test`); see the CLAUDE.md "Frontend component tests"
+section for the `@decky/api` event harness.
+
+### Property-based tests
+
+The pure save-sync decision kernels (`domain/sync_action.py`, `domain/save_path.py`, `domain/iso_time.py`) carry an
+extra tier of [Hypothesis](https://hypothesis.readthedocs.io/) property tests (`tests/domain/test_*_property.py`)
+alongside the hand-enumerated cases. They state the safety invariants directly and exercise them across a generated
+input space. Run them like any other test:
+
+```bash
+python -m pytest tests/domain/test_sync_action_property.py tests/domain/test_save_path_property.py -q
+```
+
+Hypothesis is a dev-only dependency (pinned in `requirements-dev.txt`, compiled into `requirements-dev.lock` via
+`mise run lock-update` — it never ships in the plugin). A CI-safe profile in `tests/conftest.py` sets `deadline=None`
+(no timing flakes on shared runners) and a fixed example count. The example database is written to `.hypothesis/`, which
+is gitignored. See the CLAUDE.md "Testing" section for the convention on pinning a property that encodes an open bug.
+
+### Contract tests
+
+`tests/contract/` is a tier that crosses the frontend↔backend wire. Where the unit tests check each side against its own
+mocked idea of the other, the contract tier builds the **real** `Plugin` through the **real** `bootstrap()` +
+`wire_services()` (real settings dict, real SQLite + migrations, real file-store adapters, all under `tmp_path`) and
+drives the actual `main.py` callables **exactly as the frontend does** — positional, JSON-shaped arguments with the arg
+types declared in `src/api/backend.ts` (literal `None` where the TS type says `null`). The assertions pin the response
+_shape_ (canonical failure shape, discriminated-status unions, partial-success flags), not delegation. Only the
+outermost edges are faked: the RomM + SteamGridDB network transports, the Clock/UuidGen/Sleeper seams, `emit`, and the
+retry backoff. Run them like any other test:
+
+```bash
+python -m pytest tests/contract/ -q
+```
+
+A `backend.ts` manifest gate (Phase 2) that pins the frontend and backend to one parsed artifact is a forthcoming
+separate change. See the CLAUDE.md "Testing" section for the full contract-tier rules.
+
+Every backend feature or callable where testing makes sense should have unit tests covering:
+
+- **Happy path** — normal successful operation
+- **Bad path** — invalid input, missing data, API errors, network failures
+- **Edge cases** — empty strings, None values, boundary conditions
+
+## Dev Reload
+
+```bash
+mise run dev          # build frontend, deploy to the plugin dir, restart plugin_loader
+```
+
+This builds the frontend, copies the plugin files into `~/homebrew/plugins/decky-romm-sync`, and restarts
+`plugin_loader` to pick up the changes. It **stops** `plugin_loader` around the file copy on purpose: the loader runs as
+root and continuously re-owns the plugin dir back to root within ~1–2s as a tamper guard, so copying while it runs races
+against that re-own and fails with `permission denied`. With the loader stopped, the copy is uncontested; it restarts
+automatically when the task finishes — even if the build or copy fails, so a failure never leaves the plugin dead. For
+backend-only changes, restarting the plugin loader is sufficient without rebuilding.
+
+For frontend iteration there is a much faster loop: after a one-time `mise run dev:setup`,
+`mise run dev:watch [display]` hot-reloads the **frontend** into a windowed Big Picture on the desktop as you save, with
+no loader restarts at all — put it on a second monitor with a display target like `dp2`. Backend changes are pushed on
+demand with `mise run dev:push-backend`. See [Frontend dev loop](frontend-dev-loop.md) for the full workflow, keyboard
+shortcuts, and caveats.
+
+## Deploying to Device
+
+For development, symlink the repo into the plugins directory:
+
+```bash
+sudo ln -sf "$(pwd)" ~/homebrew/plugins/decky-romm-sync
+sudo systemctl restart plugin_loader
+```
+
+This way, rebuilds take effect immediately after a Decky restart.
+
+## Linting
+
+```bash
+PYTHONPATH=py_modules lint-imports   # check service/adapter layer rules
+mise run lint                        # same via mise
+```
+
+The `.importlinter` config enforces the layer boundary contracts:
+
+- Services must not import concrete adapter implementations (Protocols are allowed)
+- Adapters must not import services
+- Utilities (`lib/`) must not import services, adapters, or domain
+- Domain must not import services or adapters (`lib` is allowed)
+- Models must not import services, adapters, domain, or lib
+- Services must not import stdlib I/O / non-deterministic primitives (`time`, `uuid`, `random`, `subprocess`,
+  `threading`, `requests`)
+- Services must be independent of each other (no cross-service imports)
+
+`mise run lint` also runs `scripts/check_cosmic_call_bans.sh`, which complements the import rules at the call site:
+services may not call `datetime.now()` / `asyncio.sleep()` / `time.time()` / `time.monotonic()` / `uuid.uuid4()` /
+`random.*` directly — they inject the `Clock` / `Sleeper` / `UuidGen` Protocol instead.
+
+`mise run lint` (and CI) also runs `scripts/check_service_independence_contract.py`, which derives the expected service
+list from `py_modules/services/` and fails if `.importlinter`'s `service-independence` contract drifts — omitting a
+service or carrying a stale entry — keeping the hand-maintained `modules` list self-healing.
+
+`mise run lint` (and CI) also runs `scripts/check_failure_shape.py --check`, which fails if any `success: False` return
+in `services/` is missing the canonical `reason` + `message` keys or carries the forbidden `error` / `error_code` key —
+collapsing the failure-shape dialects onto one vocabulary (the two documented carve-outs are pattern-exempt). Run it
+without `--check` for a report-mode inventory.
+
+`mise run lint` (and CI) also runs `scripts/check_callable_manifest.py`, which pins the frontend↔backend callable
+surface to one source of truth: it derives the frontend names + arities from every `callable<[Args], Return>("name")` in
+`src/**/*.ts` and the backend surface from the public `async def` methods on the `Plugin` class in `main.py`, then fails
+if they diverge — a callable declared on only one side (either direction) or a matching name whose arity (positional
+param count) differs. Arg types stay out of scope (Python signatures carry no hints), so arity is the only mechanically
+checkable shape. The same parity assertion is surfaced inside the pytest run by
+`tests/contract/test_callable_manifest.py`.
+
+`mise run lint` (and CI) also runs `scripts/check_event_parity.py`, which fails if a backend `emit("name", ...)` event
+has no matching frontend `addEventListener("name", ...)` (or vice versa). The event names are bare string literals, so
+the gate matches the two surfaces by literal event name — the backend side parsed via AST (`emit` / `_emit` calls), the
+frontend side via a text scan of bare `addEventListener` calls. Static sibling of the callable-manifest gate, for the
+event channel. The same parity assertion is surfaced inside the pytest run by `tests/contract/test_event_parity.py`.
+
+`mise run lint` (and CI) also runs `scripts/check_settings_owner.py`, which fails if the `settings.json` filename
+literal appears anywhere except its owning adapter (`adapters/persistence.py`); confining the literal to one module
+keeps all settings writes in the single crash-safe owner.
+
+See [Backend Architecture](../architecture/backend-architecture.md) for details.
+
+## Code Quality
+
+- **SonarCloud** — CI-based analysis on every human PR and push to main. Quality Gate enforces 80% coverage on new code,
+  0 bugs, 0 vulnerabilities. The scan is skipped on Dependabot PRs (no `SONAR_TOKEN` access in that restricted context);
+  the required status check is the `sonar-gate` job, which passes when SonarCloud succeeded or was skipped and fails
+  only when it failed — so dependency PRs aren't deadlocked on a check that can never run for them.
+- **Ruff** — Python linting in CI. Expanded ruleset includes B (bugbear), SIM (simplify), UP (pyupgrade), RUF
+  (ruff-specific), and ARG (unused arguments) in addition to the base E/F rules.
+- **basedpyright** — Type checking in CI. Checks all source files including the test suite (tests/ is not excluded).
+- **import-linter** — Layer boundary enforcement in CI (see Linting section above).
+- **pytest-cov** — Branch coverage reported to SonarCloud.
+
+## Project Structure
+
+```text
+main.py                              # Plugin entry — Decky lifecycle + callable surface
+py_modules/
+  bootstrap.py                       # Composition root — bootstrap() builds adapters, wire_services() builds services
+  services/                          # Orchestration / business logic (Protocol-typed deps via *ServiceConfig)
+    protocols/                       # Protocol interfaces, grouped: transport / determinism /
+                                     #   persistence / paths / infra / files / cross_service
+    library/                         # LibraryService façade — fetcher, sync_orchestrator, reporter, shared state box
+    saves/                           # SaveService aggregate — state, sync_engine/, slots/, status/, versions
+    downloads.py                     # DownloadService — ROM downloads, ZIP/M3U, fcntl queue
+    firmware.py                      # FirmwareService — BIOS registry + downloads
+    session_lifecycle.py             # SessionLifecycleService — post-exit orchestration
+    migration.py                     # MigrationService — RetroDECK path + save-sort migration
+    steamgrid.py                     # SteamGridService — SteamGridDB artwork
+    artwork.py                       # ArtworkService — cover art staging/cleanup
+    game_detail.py / playtime.py / achievements.py / settings.py / cores.py
+    metadata.py / rom_removal.py / shortcut_removal.py / launch_gate.py
+    startup_healing.py / connection.py
+  adapters/                          # I/O boundaries — implement Protocols
+    romm/{http,romm_api}.py          # RomM HTTP transport + REST adapter
+    steam_config.py / steamgriddb.py / sgdb_artwork_cache.py / cover_art_file_store.py
+    persistence.py                   # settings.json read/write + one-time legacy save_sync_state fold
+    repositories/                    # SqliteUnitOfWork (unit_of_work.py) + 9 repos (8 aggregate + kv_config)
+                                     #   (rom, rom_install, rom_metadata, playtime, rom_save_state,
+                                     #    bios_file, firmware_cache, sync_run, kv_config)
+    sqlite_migrations.py / machine_id.py  # schema migration runner (PRAGMA user_version) + machine-id reader
+    download_file.py / firmware_file.py / migration_file.py / rom_files.py / save_file.py
+    retrodeck_paths.py / retroarch_config.py / retroarch_core_info.py / es_de_config.py
+    system_clock.py / system_uuid_gen.py / asyncio_sleeper.py / hostname.py / path_probe.py / plugin_metadata.py / debug_logger.py
+  db/
+    migrations/001_initial.sql       # SQLite schema DDL
+  domain/                            # Pure compute — no I/O, no service/adapter imports
+    _aggregate.py                    # the @cosmic_aggregate decorator
+    rom.py / rom_install.py / rom_metadata.py / rom_metadata_mapping.py / playtime.py
+    rom_save_state.py / bios_file.py / firmware_cache.py / sync_run.py
+    sync_action.py / sync_diff.py / preview_delta.py / work_unit.py
+    save_path.py / save_status*.py / save_attribution.py / save_extensions.py
+    firmware_paths.py / bios.py / achievements.py / shortcut_data.py / steam_categories.py
+    sgdb_artwork.py / installed_roms.py / rom_files.py / retroarch_core_info.py
+    state_migrations.py / sync_state.py / emulator_tag.py / version.py
+  models/                            # Data shapes (TypedDicts/dataclasses) — independent of other layers
+  lib/                               # Cross-cutting utilities (errors, list_result, iso_time, path_safety, late_binding, ...)
+  _vendor/                           # Vendored third-party deps — not our code, only imported by adapters
+    README.md                        # Provenance per package: upstream URL, version/commit, local patches
+    vdf/                             # Valve Data Format parser (Steam shortcuts.vdf)
+      LICENSE                        # Upstream MIT license — preserved on redistribution
+src/                                 # Frontend TypeScript
+  index.tsx                          # Plugin entry, event listeners, QAM router
+  components/                        # React components (QAM pages, game detail UI)
+  patches/                           # Route and store patches
+  api/backend.ts                     # callable() wrappers (typed)
+  types/                             # TypeScript interfaces and Steam API declarations
+  utils/                             # Shortcut CRUD, sync, downloads, collections, session manager
+bin/rom-launcher                     # Pure exec wrapper — runs the launch command baked into the shortcut
+defaults/config.json                 # platform_map: 149 platform slug -> RetroDECK system mappings
+tests/                               # Backend unit tests, mirroring py_modules/ layout
+```
+
+See [Backend Architecture](../architecture/backend-architecture.md) for the service/adapter design, dependency diagram,
+and layer enforcement rules.
