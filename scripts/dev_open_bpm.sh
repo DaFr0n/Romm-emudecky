@@ -75,7 +75,7 @@ list_targets() {
   local name outputs
   outputs=$(enabled_outputs)
   while IFS= read -r name; do
-    [ -n "$name" ] || continue
+    [[ -n "$name" ]] || continue
     case "$(normalize "$name")" in
       edp*)
         echo "internal"
@@ -86,7 +86,7 @@ list_targets() {
 $outputs
 EOF
   while IFS= read -r name; do
-    [ -n "$name" ] || continue
+    [[ -n "$name" ]] || continue
     printf '%s\n' "$(normalize "$name")"
   done <<EOF
 $outputs
@@ -99,11 +99,11 @@ resolve_target() {
   requested="$1"
   normalized=$(normalize "$requested")
   while IFS= read -r name; do
-    [ -n "$name" ] || continue
+    [[ -n "$name" ]] || continue
     candidate=$(normalize "$name")
-    if [ "$normalized" = "internal" ]; then
+    if [[ "$normalized" = "internal" ]]; then
       case "$candidate" in edp*) printf '%s\n' "$name"; return 0 ;; esac
-    elif [ "$candidate" = "$normalized" ]; then
+    elif [[ "$candidate" = "$normalized" ]]; then
       printf '%s\n' "$name"
       return 0
     fi
@@ -118,7 +118,7 @@ arm_kwin_placement() {
   # Status 1 (with nothing armed) if any step of the DBus route fails.
   local output="$1" qdbus js_file script_id
   qdbus=$(command -v qdbus6 || command -v qdbus || true)
-  [ -n "$qdbus" ] || return 1
+  [[ -n "$qdbus" ]] || return 1
   js_file=$(mktemp --suffix=.js) || return 1
   cat > "$js_file" <<'EOF' || { rm -f "$js_file"; return 1; }
 var TARGET_OUTPUT = "@TARGET@";
@@ -304,8 +304,8 @@ case "$TARGET" in
 esac
 
 RESOLVED=$(resolve_target "$TARGET") || RESOLVED=""
-if [ -z "$RESOLVED" ]; then
-  if [ "$(normalize "$TARGET")" = "internal" ]; then
+if [[ -z "$RESOLVED" ]]; then
+  if [[ "$(normalize "$TARGET")" = "internal" ]]; then
     echo "warning: no enabled internal (eDP*) panel found — window placement will be skipped" >&2
   else
     {
@@ -316,15 +316,15 @@ if [ -z "$RESOLVED" ]; then
   fi
 fi
 
-if [ "$MODE" = "resolve" ]; then
-  [ -n "$RESOLVED" ] && echo "$RESOLVED"
+if [[ "$MODE" = "resolve" ]]; then
+  [[ -n "$RESOLVED" ]] && echo "$RESOLVED"
   exit 0
 fi
 
 # Arm the KWin watcher BEFORE opening Big Picture so the window-added signal
 # is already connected when the window appears (no race). The sweep half
 # covers a BPM window that is already open on the wrong monitor.
-if [ -n "$RESOLVED" ]; then
+if [[ -n "$RESOLVED" ]]; then
   if arm_kwin_placement "$RESOLVED"; then
     echo "Big Picture window will be placed on $RESOLVED."
   else
