@@ -24,7 +24,6 @@ The pure launch-string construction lives in
 from __future__ import annotations
 
 import os
-import stat
 from typing import TYPE_CHECKING, Any, Protocol
 
 from domain.emudeck_launch import (
@@ -109,41 +108,11 @@ class EmuDeckLauncherAdapter:
             or os.path.basename(launcher_script) != launcher_script
         ):
             return False
-        # Resolve in-tree aliases, while rejecting links escaping the trusted
-        # launcher directory. The resolved relative name is then opened
-        # against a directory descriptor rather than an arbitrary absolute path.
         root = os.path.realpath(self._paths.launchers_path())
-        target = os.path.realpath(os.path.join(root, launcher_script))
-        if os.path.commonpath((root, target)) != root:
+        path = os.path.realpath(self._launcher_full_path(launcher_script))
+        if os.path.commonpath((root, path)) != root:
             return False
-        relative_target = os.path.relpath(target, root)
-        if relative_target in (".", "..") or relative_target.startswith(".." + os.sep):
-            return False
-        try:
-            directory_fd = os.open(
-                root,
-                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0),
-            )
-        except OSError:
-            return False
-        try:
-            flags = getattr(os, "O_PATH", os.O_RDONLY) | getattr(os, "O_CLOEXEC", 0)
-            flags |= getattr(os, "O_NOFOLLOW", 0)
-            try:
-                fd = os.open(relative_target, flags, dir_fd=directory_fd)
-            except OSError:
-                return False
-            try:
-                info = os.fstat(fd)
-                return (
-                    stat.S_ISREG(info.st_mode)
-                    and bool(info.st_mode & 0o111)
-                    and os.access(relative_target, os.X_OK, dir_fd=directory_fd, follow_symlinks=False)
-                )
-            finally:
-                os.close(fd)
-        finally:
-            os.close(directory_fd)
+        return os.path.isfile(path) and os.access(path, os.X_OK)
 
     def resolve_for(
         self,
