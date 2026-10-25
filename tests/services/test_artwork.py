@@ -360,7 +360,9 @@ class TestFinalizeCoverPath:
         assert file_store.files[cache] == b"cover data"
         assert file_store.files[expected_final] == b"cover data"
 
-    def test_preserves_preexisting_custom_portrait_without_snapshot(self, artwork_service, file_store, cover_cache_dir, tmp_path):
+    def test_preserves_preexisting_custom_portrait_without_snapshot(
+        self, artwork_service, file_store, cover_cache_dir, tmp_path
+    ):
         grid = str(tmp_path / "grid")
         cache = _cache(cover_cache_dir, 1)
         final = os.path.join(grid, "100001p.png")
@@ -369,7 +371,9 @@ class TestFinalizeCoverPath:
         artwork_service.finalize_cover_path(grid, cache, 100001, "1")
         assert file_store.files[final] == b"steamgriddb"
 
-    def test_preserves_manual_change_after_managed_publish(self, artwork_service, file_store, cover_cache_dir, tmp_path):
+    def test_preserves_manual_change_after_managed_publish(
+        self, artwork_service, file_store, cover_cache_dir, tmp_path
+    ):
         grid = str(tmp_path / "grid")
         cache = _cache(cover_cache_dir, 1)
         final = os.path.join(grid, "100001p.png")

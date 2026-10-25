@@ -1,10 +1,11 @@
 # Romm-emudecky
 
-> **Fork** of [danielcopper/decky-romm-sync](https://github.com/danielcopper/decky-romm-sync) — ported from RetroDECK to EmuDeck.
+> **Fork** of [danielcopper/decky-romm-sync](https://github.com/danielcopper/decky-romm-sync) — ported from RetroDECK to
+> EmuDeck.
 
 A [Decky Loader](https://decky.xyz/) plugin that syncs your self-hosted [RomM](https://github.com/rommapp/romm) library
-into Steam as non-steam shortcuts. Games appear directly in your Steam library, launch through
-EmuDeck, and keep their saves in sync across devices through your RomM server.
+into Steam as non-steam shortcuts. Games appear directly in your Steam library, launch through EmuDeck, and keep their
+saves in sync across devices through your RomM server.
 
 ## Features
 
@@ -19,8 +20,8 @@ EmuDeck, and keep their saves in sync across devices through your RomM server.
 - **Controller friendly** — Full gamepad navigation throughout the plugin UI
 - **Steam Input config** — Per-shortcut Steam Input mode (Default / Force On / Force Off)
 - **EmuDeck path migration** — Move your EmuDeck installation between storage locations without re-syncing
-- **EmuDeck health diagnostics** — Detects misconfigured input drivers and EmuDeck configuration issues that break
-  menu navigation
+- **EmuDeck health diagnostics** — Detects misconfigured input drivers and EmuDeck configuration issues that break menu
+  navigation
 
 ## Screenshots
 
@@ -68,8 +69,8 @@ gear icon → toggle **Developer Mode**).
 3. In **Platforms**, enable the platforms you want to sync
 4. Hit **Sync Library** — your ROMs appear as non-steam shortcuts
 
-See the [User Guide](https://melikootje.github.io/Romm-emudecky/user-guide/syncing-your-library/) for syncing
-details, [save sync](https://melikootje.github.io/Romm-emudecky/user-guide/save-sync/), and
+See the [User Guide](https://melikootje.github.io/Romm-emudecky/user-guide/syncing-your-library/) for syncing details,
+[save sync](https://melikootje.github.io/Romm-emudecky/user-guide/save-sync/), and
 [BIOS management](https://melikootje.github.io/Romm-emudecky/user-guide/bios-management/).
 
 ## Contributing
@@ -77,8 +78,8 @@ details, [save sync](https://melikootje.github.io/Romm-emudecky/user-guide/save-
 Build from source, run the tests, and read the architecture reference on the documentation site:
 
 - [Development setup](https://melikootje.github.io/Romm-emudecky/contributing/development/)
-- [Frontend dev loop](https://melikootje.github.io/Romm-emudecky/contributing/frontend-dev-loop/) — live-reload the
-  UI into a windowed Big Picture on the Deck, no Game Mode switching
+- [Frontend dev loop](https://melikootje.github.io/Romm-emudecky/contributing/frontend-dev-loop/) — live-reload the UI
+  into a windowed Big Picture on the Deck, no Game Mode switching
 - [Backend architecture](https://melikootje.github.io/Romm-emudecky/architecture/backend-architecture/)
 
 ## Acknowledgments

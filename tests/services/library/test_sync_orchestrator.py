@@ -34,7 +34,6 @@ from adapters.persistence import (
     PersistenceAdapter,
 )
 from domain.preview_delta import PreviewDelta
-
 from domain.sync_diff import BIND_ROM_ID_KEY
 from domain.sync_state import SyncState
 from domain.work_unit import WorkUnit
@@ -203,14 +202,18 @@ class TestShortcutDataFormat:
         result = build_shortcuts_data([{"id": 1, "name": "Game"}], decky.DECKY_PLUGIN_DIR, {}, {})
         exe = result[0]["exe"]
         assert exe.endswith("/bin/rom-launcher"), f"Exe path should end with /bin/rom-launcher, got: {exe}"
-        assert "decky-romm-sync" in exe, f"Exe path should contain plugin name, got: {exe}"
+        assert os.path.dirname(os.path.dirname(exe)) == os.path.abspath(decky.DECKY_PLUGIN_DIR), (
+            f"Exe path should be inside the configured plugin directory, got: {exe}"
+        )
 
     def test_installed_rom_gets_launch_command(self, plugin):
         """An installed ROM with a resolved invocation bakes the full launch command."""
         from domain.shortcut_data import build_shortcuts_data
 
         invocation = "flatpak run net.retrodeck.retrodeck"
-        result = build_shortcuts_data([{"id": 42, "name": "Game"}], "/plugin", {42: "/roms/n64/game.z64"}, {42: invocation})
+        result = build_shortcuts_data(
+            [{"id": 42, "name": "Game"}], "/plugin", {42: "/roms/n64/game.z64"}, {42: invocation}
+        )
         assert result[0]["launch_options"] == 'flatpak run net.retrodeck.retrodeck "/roms/n64/game.z64"'
 
     def test_start_dir_is_parent_of_exe(self, plugin):
