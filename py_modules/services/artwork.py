@@ -250,10 +250,26 @@ class ArtworkService:
         if not self._cover_art_file_store.exists(cover_path):
             return final_path if self._cover_art_file_store.exists(final_path) else cover_path
         if cover_path != final_path:
+            # Keep a snapshot of the last portrait *we* published. SteamGridDB
+            # changes the grid file, not this plugin-owned snapshot. This also
+            # supports multi-version shortcuts: unchanged managed portraits may
+            # be replaced when switching ROM versions.
+            snapshot = os.path.join(self._cover_cache_dir, f"published_{app_id}p.png")
             try:
+                if self._cover_art_file_store.exists(final_path):
+                    if not self._cover_art_file_store.exists(snapshot):
+                        # Upgrade-safe: ownership of an existing cover is unknown.
+                        self._logger.info("Preserving existing portrait for app %s (no ownership snapshot)", app_id)
+                        return cover_path
+                    current = self._cover_art_file_store.read_bytes(final_path)
+                    previous = self._cover_art_file_store.read_bytes(snapshot)
+                    if current != previous:
+                        self._logger.info("Preserving custom Steam portrait for app %s", app_id)
+                        return cover_path
                 self._copy_atomic(cover_path, final_path)
+                self._copy_atomic(cover_path, snapshot)
             except OSError as e:
-                self._logger.warning(f"Failed to copy artwork for rom {rom_id_str}: {e}")
+                self._logger.warning(f"Failed to publish artwork for rom {rom_id_str}: {e}")
         return cover_path
 
     # ── Artwork removal ────────────────────────────────────────────────────
