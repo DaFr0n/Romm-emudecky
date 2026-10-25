@@ -526,7 +526,7 @@ Until a provider exists for the active emulator:
 
 ## 11. Migration and health behavior
 
-### MVP
+### Migration MVP
 
 Disable or remove RetroDECK-specific migration UX.
 
