@@ -14,7 +14,7 @@ emulator invocation for that system.
 
 ### Component Overview
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │ ActiveCoreResolver                                          │
 │   → determines which emulator (EmulatorInvocation)          │
@@ -258,7 +258,7 @@ class EmuDeckConfigHealth(Enum):
 
 The EmuDeck launch resolution integrates with the existing core selection system through the following flow:
 
-```
+```text
 1. ActiveCoreResolver.active_emulator_for_rom(rom_id)
    → Returns EmulatorInvocation (kind, core_so, label, command)
 
