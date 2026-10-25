@@ -241,7 +241,7 @@ class TestLauncherPathSecurity:
     def test_symlink_escape_is_rejected(self, tmp_path):
         launchers = _make_launcher(tmp_path, "safe.sh")
         outside = tmp_path / "outside.sh"
-        outside.write_text("#!/bin/sh\\n")
+        outside.write_text("#!/bin/sh\n")
         outside.chmod(0o755)
         os.symlink(outside, os.path.join(launchers, "outside.sh"))
         adapter = EmuDeckLauncherAdapter(
