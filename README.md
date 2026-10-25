@@ -1,7 +1,8 @@
 # Romm-emudecky
 
-> **Security changes & AI disclosure:**
-> [Read the summary of security hardening, validation, and AI-assisted development (PR #2)](https://github.com/DaFr0n/Romm-emudecky/pull/2).
+> **Fork changes and AI assistance:** This fork adapts RomM Sync for EmuDeck. The merged work includes a launcher-path CI test correction ([PR #1](https://github.com/DaFr0n/Romm-emudecky/pull/1)), security hardening for BIOS registry reads, launcher paths and release downloads ([PR #2](https://github.com/DaFr0n/Romm-emudecky/pull/2)), and a Sonar test assertion fix ([PR #3](https://github.com/DaFr0n/Romm-emudecky/pull/3)). The experimental filesystem-probe changes in [PR #4](https://github.com/DaFr0n/Romm-emudecky/pull/4) were **not merged**. Four pre-existing SonarCloud filesystem-oracle findings remain under review.
+>
+> **AI disclosure:** OpenAI ChatGPT assisted with reviewing findings, proposing and editing changes, tests, CI/build troubleshooting, and documentation. The maintainer tested the installable Decky build and reported the changes working on a Legion Go S running SteamOS. AI assistance and a successful build do not guarantee that all issues are resolved.
 >
 > **EmuDeck fork** of [melikootje/Romm-emudecky](https://github.com/melikootje/Romm-emudecky), originally based on
 > [danielcopper/decky-romm-sync](https://github.com/danielcopper/decky-romm-sync). This branch targets EmuDeck rather than RetroDECK.
