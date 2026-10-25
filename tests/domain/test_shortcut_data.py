@@ -4,7 +4,6 @@ import os
 import shlex
 
 from domain.shortcut_data import (
-    EmulatorInvocation,
     build_launch_options,
     build_shortcuts_data,
 )
@@ -83,7 +82,10 @@ class TestBuildLaunchOptions:
         ]
 
     def test_override_invocation_is_preserved_unescaped(self):
-        invocation = 'flatpak run net.retrodeck.retrodeck -e "%EMULATOR_RETROARCH% -L /var/config/retroarch/cores/mgba.so %ROM%"'
+        invocation = (
+            'flatpak run net.retrodeck.retrodeck -e '
+            '"%EMULATOR_RETROARCH% -L /var/config/retroarch/cores/mgba.so %ROM%"'
+        )
         path = '/roms/gba/Game".gba'
         result = build_launch_options(invocation, path)
         assert '-e "%EMULATOR_RETROARCH% -L /var/config/retroarch/cores/mgba.so %ROM%"' in result
