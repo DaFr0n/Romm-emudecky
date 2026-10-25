@@ -208,9 +208,6 @@ class EmuDeckPathsAdapter:
         # Probe only the Emulation root, matching the SD-card-ejected
         # failure mode EmuDeck users actually hit (the whole tree goes
         # away together, not just the roms subtree).
-        root = self.emulation_root()
-        if not os.path.isabs(root) or os.path.normpath(root) != root:
-            return EmuDeckConfigHealth.INVALID
-        if not os.path.isdir(root):
+        if not os.path.isdir(self.emulation_root()):
             return EmuDeckConfigHealth.ROOT_MISSING
         return EmuDeckConfigHealth.OK
