@@ -175,6 +175,15 @@ def systemname_to_slug(systemname):
     return slug
 
 
+def _contained_file(root, relative_path):
+    """Reject symlink escapes and paths outside the selected source checkout."""
+    root_real = os.path.realpath(root)
+    candidate = os.path.realpath(os.path.join(root_real, relative_path))
+    if os.path.commonpath((root_real, candidate)) != root_real:
+        raise ValueError(f"Source path escapes checkout: {relative_path}")
+    return candidate
+
+
 def parse_info_files(core_info_dir):
     """Parse all .info files for firmware entries with system name.
 
@@ -199,7 +208,11 @@ def parse_info_files(core_info_dir):
         if not fname.endswith(".info"):
             continue
         core_so = fname[:-5]  # "mgba_libretro.info" -> "mgba_libretro"
-        filepath = os.path.join(core_info_dir, fname)
+        try:
+            filepath = _contained_file(core_info_dir, fname)
+        except ValueError as exc:
+            print(f"Warning: {exc}", file=sys.stderr)
+            continue
         try:
             with open(filepath, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
@@ -285,7 +298,11 @@ def parse_system_dat(database_dir):
 
     Returns dict: {filename: {"size": int, "md5": str, "sha1": str}}
     """
-    dat_path = os.path.join(database_dir, "dat", "System.dat")
+    try:
+        dat_path = _contained_file(database_dir, os.path.join("dat", "System.dat"))
+    except ValueError as exc:
+        print(f"Warning: {exc}", file=sys.stderr)
+        return {}
     if not os.path.isfile(dat_path):
         print(f"Warning: {dat_path} not found", file=sys.stderr)
         return {}
