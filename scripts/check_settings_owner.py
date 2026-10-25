@@ -89,7 +89,15 @@ def find_violations(files: list[Path] | None = None) -> list[str]:
             for node in ast.walk(tree)
             if isinstance(node, ast.Constant)
             and node.value == SETTINGS_FILENAME
-            and not (path.resolve() == EMUDECK_CONFIG_READER.resolve() and node.lineno == 74)
+            and not (
+                path.resolve() == EMUDECK_CONFIG_READER.resolve()
+                and any(
+                    isinstance(method, ast.FunctionDef)
+                    and method.name == "config_path"
+                    and method.lineno <= node.lineno <= method.end_lineno
+                    for method in ast.walk(tree)
+                )
+            )
         )
     return sorted(findings)
 
