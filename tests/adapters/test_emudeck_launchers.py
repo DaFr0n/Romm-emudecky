@@ -221,3 +221,46 @@ class TestNoRetrodeckLeak:
         assert "/var/config/retroarch/cores" not in res.launch_options
         assert "%EMULATOR_" not in res.launch_options
         assert "%ROM%" not in res.launch_options
+
+class TestLauncherPathSecurity:
+    """Only mapped scripts inside the EmuDeck launcher tree may be launched."""
+
+    def test_parent_traversal_is_rejected(self, tmp_path):
+        launchers = _make_launcher(tmp_path, "safe.sh")
+        adapter = EmuDeckLauncherAdapter(
+            paths=_FakePaths(launchers=launchers),
+            retroarch_cores_dir="/x/c",
+            system_launcher_map={"ps3": "../safe.sh"},
+            logger=logging.getLogger("test"),
+        )
+        result = adapter.resolve_for({}, EmulatorInvocation.standalone("%EMULATOR_RPCS3% %ROM%"), "ps3")
+        assert result.status == RESOLUTION_LAUNCHER_MISSING
+        assert result.launch_options == ""
+
+    def test_symlink_escape_is_rejected(self, tmp_path):
+        launchers = _make_launcher(tmp_path, "safe.sh")
+        outside = tmp_path / "outside.sh"
+        outside.write_text("#!/bin/sh\\n")
+        outside.chmod(0o755)
+        os.symlink(outside, os.path.join(launchers, "outside.sh"))
+        adapter = EmuDeckLauncherAdapter(
+            paths=_FakePaths(launchers=launchers),
+            retroarch_cores_dir="/x/c",
+            system_launcher_map={"ps3": "outside.sh"},
+            logger=logging.getLogger("test"),
+        )
+        result = adapter.resolve_for({}, EmulatorInvocation.standalone("%EMULATOR_RPCS3% %ROM%"), "ps3")
+        assert result.status == RESOLUTION_LAUNCHER_MISSING
+        assert result.launch_options == ""
+
+    def test_symlink_within_launcher_tree_remains_supported(self, tmp_path):
+        launchers = _make_launcher(tmp_path, "safe.sh")
+        os.symlink("safe.sh", os.path.join(launchers, "alias.sh"))
+        adapter = EmuDeckLauncherAdapter(
+            paths=_FakePaths(launchers=launchers),
+            retroarch_cores_dir="/x/c",
+            system_launcher_map={"ps3": "alias.sh"},
+            logger=logging.getLogger("test"),
+        )
+        result = adapter.resolve_for({}, EmulatorInvocation.standalone("%EMULATOR_RPCS3% %ROM%"), "ps3")
+        assert result.status == RESOLUTION_OK
