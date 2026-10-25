@@ -68,7 +68,7 @@ jobs:
       - name: Download Decky CLI
         run: |
           mkdir -p /tmp/decky-cli
-          curl -L -o /tmp/decky-cli/decky "https://github.com/SteamDeckHomebrew/cli/releases/download/0.0.8/decky-linux-x86_64"
+          curl --fail --location --proto "=https" --proto-redir "=https" -o /tmp/decky-cli/decky "https://github.com/SteamDeckHomebrew/cli/releases/download/0.0.8/decky-linux-x86_64"
           # Pin the Decky CLI binary by SHA-256: it runs under sudo to build the
           # zip every user installs, so it is the pipeline's highest-leverage
           # supply-chain link. The hash is GitHub's own asset digest for tag 0.0.8

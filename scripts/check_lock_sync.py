@@ -37,7 +37,7 @@ PAIRS = [
 
 # A pinned line in a uv-compiled lock: `name==version` at column 0 (the `# via`
 # provenance lines are indented, the header lines start with `#`).
-_PIN_RE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==(.+?)\s*$")
+_PIN_RE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;#]+)$")
 
 
 def parse_sources(path: Path) -> list[Requirement]:
