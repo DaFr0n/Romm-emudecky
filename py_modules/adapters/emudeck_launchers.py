@@ -109,24 +109,34 @@ class EmuDeckLauncherAdapter:
             or os.path.basename(launcher_script) != launcher_script
         ):
             return False
-        root = os.path.realpath(self._paths.launchers_path())
-        path = os.path.realpath(self._launcher_full_path(launcher_script))
-        if os.path.commonpath((root, path)) != root:
+        # Open the launcher directory first and resolve the validated basename
+        # relative to its descriptor. O_NOFOLLOW rejects launcher symlinks,
+        # avoiding a path validation / open race on the final component.
+        try:
+            directory_fd = os.open(
+                self._paths.launchers_path(),
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0),
+            )
+        except OSError:
             return False
-        # Open the validated target instead of reporting metadata about an
-        # arbitrary filename. O_NOFOLLOW rejects a last-moment symlink swap.
-        # The descriptor is always closed, including on permission failures.
         try:
             flags = getattr(os, "O_PATH", os.O_RDONLY) | getattr(os, "O_CLOEXEC", 0)
             flags |= getattr(os, "O_NOFOLLOW", 0)
-            fd = os.open(path, flags)
+            try:
+                fd = os.open(launcher_script, flags, dir_fd=directory_fd)
+            except OSError:
+                return False
             try:
                 info = os.fstat(fd)
-                return stat.S_ISREG(info.st_mode) and bool(info.st_mode & 0o111) and os.access(path, os.X_OK)
+                return (
+                    stat.S_ISREG(info.st_mode)
+                    and bool(info.st_mode & 0o111)
+                    and os.access(launcher_script, os.X_OK, dir_fd=directory_fd, follow_symlinks=False)
+                )
             finally:
                 os.close(fd)
-        except OSError:
-            return False
+        finally:
+            os.close(directory_fd)
 
     def resolve_for(
         self,
