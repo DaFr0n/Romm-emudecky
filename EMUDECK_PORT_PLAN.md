@@ -2,7 +2,9 @@
 
 > Target: fork `danielcopper/decky-romm-sync` so RomM Sync uses an existing EmuDeck installation instead of RetroDECK.
 >
-> Strategy: preserve the RomM, Steam shortcut, artwork, download queue, persistence, metadata, and UI architecture. Replace the host-emulation integration layer behind explicit adapters/resolvers. Ship ROM sync + launch first; defer full save-sync parity until emulator-specific save adapters exist.
+> Strategy: preserve the RomM, Steam shortcut, artwork, download queue, persistence, metadata, and UI architecture.
+> Replace the host-emulation integration layer behind explicit adapters/resolvers. Ship ROM sync + launch first; defer
+> full save-sync parity until emulator-specific save adapters exist.
 
 ---
 
@@ -324,7 +326,8 @@ SYSTEM_DEFAULT_LAUNCHERS = {
 
 Do not commit guessed launcher names without verifying them on a real EmuDeck installation.
 
-For systems using RetroArch, determine the most stable EmuDeck-provided launcher route and use that instead of hardcoding RetroArch Flatpak internals.
+For systems using RetroArch, determine the most stable EmuDeck-provided launcher route and use that instead of
+hardcoding RetroArch Flatpak internals.
 
 ### Launch fallback order
 
@@ -463,7 +466,8 @@ Nintendo DS
 Switch-family special folders
 ```
 
-For firmware that must be installed through an emulator UI or API, mark it unsupported in MVP rather than pretending that copying a file is sufficient.
+For firmware that must be installed through an emulator UI or API, mark it unsupported in MVP rather than pretending
+that copying a file is sufficient.
 
 ---
 
@@ -883,16 +887,16 @@ Use a disposable RomM test library.
 
 Test matrix:
 
-| Case | Internal storage | SD/external |
-|---|---:|---:|
-| Detect EmuDeck | ✓ | ✓ |
-| Download ROM | ✓ | ✓ |
-| Launch RetroArch system | ✓ | ✓ |
-| Launch standalone system | ✓ | ✓ |
-| Uninstall | ✓ | ✓ |
-| BIOS download | ✓ | ✓ |
-| Storage unavailable | n/a | ✓ |
-| Reinsert storage | n/a | ✓ |
+| Case                     | Internal storage | SD/external |
+| ------------------------ | ---------------: | ----------: |
+| Detect EmuDeck           |                ✓ |           ✓ |
+| Download ROM             |                ✓ |           ✓ |
+| Launch RetroArch system  |                ✓ |           ✓ |
+| Launch standalone system |                ✓ |           ✓ |
+| Uninstall                |                ✓ |           ✓ |
+| BIOS download            |                ✓ |           ✓ |
+| Storage unavailable      |              n/a |           ✓ |
+| Reinsert storage         |              n/a |           ✓ |
 
 ### Regression requirement
 

@@ -34,7 +34,6 @@ from adapters.persistence import (
     PersistenceAdapter,
 )
 from domain.preview_delta import PreviewDelta
-
 from domain.sync_diff import BIND_ROM_ID_KEY
 from domain.sync_state import SyncState
 from domain.work_unit import WorkUnit

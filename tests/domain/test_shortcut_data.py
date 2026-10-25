@@ -83,8 +83,7 @@ class TestBuildLaunchOptions:
 
     def test_override_invocation_is_preserved_unescaped(self):
         invocation = (
-            'flatpak run net.retrodeck.retrodeck -e '
-            '"%EMULATOR_RETROARCH% -L /var/config/retroarch/cores/mgba.so %ROM%"'
+            'flatpak run net.retrodeck.retrodeck -e "%EMULATOR_RETROARCH% -L /var/config/retroarch/cores/mgba.so %ROM%"'
         )
         path = '/roms/gba/Game".gba'
         result = build_launch_options(invocation, path)
@@ -161,12 +160,12 @@ class TestBuildShortcutsData:
     def test_installed_rom_with_core_override_bakes_pre_resolved_invocation(self):
         roms = [{"id": 1, "name": "PSX Game"}]
         override = (
-            'flatpak run net.retrodeck.retrodeck '
+            "flatpak run net.retrodeck.retrodeck "
             '-e "%EMULATOR_RETROARCH% -L /var/config/retroarch/cores/pcsx_rearmed_libretro.so %ROM%"'
         )
         result = build_shortcuts_data(roms, "/plugin", {1: "/roms/psx/game.chd"}, {1: override})
         assert result[0]["launch_options"] == (
-            'flatpak run net.retrodeck.retrodeck '
+            "flatpak run net.retrodeck.retrodeck "
             '-e "%EMULATOR_RETROARCH% -L /var/config/retroarch/cores/pcsx_rearmed_libretro.so %ROM%" '
             '"/roms/psx/game.chd"'
         )

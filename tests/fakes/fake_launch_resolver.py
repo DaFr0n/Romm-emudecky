@@ -71,7 +71,7 @@ class FakeLaunchResolver:
             return f'{_RETRODECK_INVOCATION} -e "{emulator.command}"'
         if emulator.kind == "libretro" and emulator.core_so:
             return (
-                f'{_RETRODECK_INVOCATION} -e '
+                f"{_RETRODECK_INVOCATION} -e "
                 f'"%EMULATOR_RETROARCH% -L {_RETROARCH_CORES_DIR}/{emulator.core_so}.so %ROM%"'
             )
         return _RETRODECK_INVOCATION
