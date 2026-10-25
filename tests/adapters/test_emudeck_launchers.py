@@ -222,6 +222,7 @@ class TestNoRetrodeckLeak:
         assert "%EMULATOR_" not in res.launch_options
         assert "%ROM%" not in res.launch_options
 
+
 class TestLauncherPathSecurity:
     """Only mapped scripts inside the EmuDeck launcher tree may be launched."""
 
