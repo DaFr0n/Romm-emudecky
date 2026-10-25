@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, emudeck-port]
   pull_request:
-    branches: [main]
+    branches: [main, emudeck-port]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
