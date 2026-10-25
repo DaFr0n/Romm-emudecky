@@ -125,6 +125,9 @@ class RetroDeckPathsAdapter:
         ):
             return self._last_load_health
         # Config read OK — probe the resolved home directory on disk.
-        if not os.path.isdir(self.retrodeck_home()):
+        root = self.retrodeck_home()
+        if not os.path.isabs(root) or os.path.normpath(root) != root:
+            return RetroDeckConfigHealth.ROOT_MISSING
+        if not os.path.isdir(root):
             return RetroDeckConfigHealth.ROOT_MISSING
         return RetroDeckConfigHealth.OK
