@@ -360,6 +360,36 @@ class TestFinalizeCoverPath:
         assert file_store.files[cache] == b"cover data"
         assert file_store.files[expected_final] == b"cover data"
 
+    def test_preserves_preexisting_custom_portrait_without_snapshot(self, artwork_service, file_store, cover_cache_dir, tmp_path):
+        grid = str(tmp_path / "grid")
+        cache = _cache(cover_cache_dir, 1)
+        final = os.path.join(grid, "100001p.png")
+        file_store.files[cache] = b"romm"
+        file_store.files[final] = b"steamgriddb"
+        artwork_service.finalize_cover_path(grid, cache, 100001, "1")
+        assert file_store.files[final] == b"steamgriddb"
+
+    def test_preserves_manual_change_after_managed_publish(self, artwork_service, file_store, cover_cache_dir, tmp_path):
+        grid = str(tmp_path / "grid")
+        cache = _cache(cover_cache_dir, 1)
+        final = os.path.join(grid, "100001p.png")
+        file_store.files[cache] = b"romm"
+        artwork_service.finalize_cover_path(grid, cache, 100001, "1")
+        file_store.files[final] = b"steamgriddb"
+        artwork_service.finalize_cover_path(grid, cache, 100001, "1")
+        assert file_store.files[final] == b"steamgriddb"
+
+    def test_allows_managed_version_switch(self, artwork_service, file_store, cover_cache_dir, tmp_path):
+        grid = str(tmp_path / "grid")
+        cache_a = _cache(cover_cache_dir, 1)
+        cache_b = _cache(cover_cache_dir, 2)
+        final = os.path.join(grid, "100001p.png")
+        file_store.files[cache_a] = b"version A"
+        file_store.files[cache_b] = b"version B"
+        artwork_service.finalize_cover_path(grid, cache_a, 100001, "1")
+        artwork_service.finalize_cover_path(grid, cache_b, 100001, "2")
+        assert file_store.files[final] == b"version B"
+
     def test_returns_existing_final_when_cover_missing(self, artwork_service, file_store, tmp_path):
         grid = str(tmp_path)
         final = os.path.join(grid, "100001p.png")
