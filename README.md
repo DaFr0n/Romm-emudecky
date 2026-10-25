@@ -3,8 +3,8 @@
 > **Security changes & AI disclosure:**
 > [Read the summary of security hardening, validation, and AI-assisted development (PR #2)](https://github.com/DaFr0n/Romm-emudecky/pull/2).
 >
-> **Fork** of [danielcopper/decky-romm-sync](https://github.com/danielcopper/decky-romm-sync) — ported from RetroDECK to
-> EmuDeck.
+> **EmuDeck fork** of [melikootje/Romm-emudecky](https://github.com/melikootje/Romm-emudecky), originally based on
+> [danielcopper/decky-romm-sync](https://github.com/danielcopper/decky-romm-sync). This branch targets EmuDeck rather than RetroDECK.
 
 A [Decky Loader](https://decky.xyz/) plugin that syncs your self-hosted [RomM](https://github.com/rommapp/romm) library
 into Steam as non-steam shortcuts. Games appear directly in your Steam library, launch through EmuDeck, and keep their
@@ -34,6 +34,13 @@ saves in sync across devices through your RomM server.
 |                              **BIOS management**                               |                                      **Per-game actions**                                       |
 | ![BIOS status showing a required file to download](assets/screenshot-bios.jpg) | ![RomM actions menu: sync saves, download BIOS, refresh artwork](assets/screenshot-actions.jpg) |
 
+## Current status
+
+- **Tested on Legion Go S (SteamOS):** the Decky plugin ZIP installs successfully, and the fork's merged changes have been tested by the maintainer.
+- **Development branch:** [`emudeck-port`](https://github.com/DaFr0n/Romm-emudecky/tree/emudeck-port). The working changes from PRs #1–#3 are merged; the unsuccessful filesystem-probe experiment in PR #4 was not merged.
+- **Security:** launcher-path containment checks and other hardening are included. Four inherited SonarCloud filesystem-oracle findings remain under review; passing a build does not establish that they are resolved.
+- **Compatibility:** functionality can depend on installed EmuDeck launcher scripts and emulator configuration. Not every emulator or save-sync scenario has been verified.
+
 ## Requirements
 
 - [Decky Loader](https://decky.xyz/) on your Steam Deck or Linux HTPC — the plugin lives in Steam's gamepad UI, so it
@@ -44,26 +51,18 @@ saves in sync across devices through your RomM server.
 
 ## Installation
 
-### From the Decky Store
+### Test build from GitHub Actions
 
-> ⚠️ **Not available yet.** The plugin will be submitted to the [Decky Store](https://plugins.deckbrew.xyz/) with the
-> **v1.0** release. Until then, use the manual install below.
+This fork currently distributes test builds through **GitHub Actions artifacts**, not GitHub Releases or the Decky Store.
 
-Once published, install it straight from Decky's built-in store — open the Quick Access Menu → **Decky** → store icon,
-search for **RomM Sync**, and install. No Developer Mode required.
+1. Open the [Build EmuDeck Plugin ZIP workflow](https://github.com/DaFr0n/Romm-emudecky/actions/workflows/build-emudeck.yml).
+2. Open the latest **successful** run for `emudeck-port`.
+3. Under **Artifacts**, download `RomM-EmuDeck-Decky-Plugin` (GitHub login may be required).
+4. **Extract the downloaded artifact ZIP**. It contains the actual Decky-installable plugin ZIP; do not submit the outer GitHub artifact archive or the repository's **Code → Download ZIP** source archive to Decky.
+5. In Decky Loader, enable **Developer Mode**, then open **Settings → Developer → Install Plugin from ZIP** and select the **inner plugin ZIP**.
+6. Back up existing plugin settings and saves before updating. Restart Decky Loader if necessary, then verify connection, paths, ROM downloads, shortcuts and saves.
 
-### From ZIP or URL
-
-This is the current method while v1.0 is in progress. It requires **Developer Mode** in Decky Loader (Decky settings →
-gear icon → toggle **Developer Mode**).
-
-1. Download the latest `decky-romm-sync.zip` from the
-   [releases page](https://github.com/melikootje/Romm-emudecky/releases)
-2. In Decky settings → **Developer** tab → **Install Plugin from ZIP** (or **from URL** with the
-   [latest release link](https://github.com/melikootje/Romm-emudecky/releases/latest/download/decky-romm-sync.zip))
-
-> Full step-by-step instructions, including first-time setup, are in
-> [Getting Started](https://melikootje.github.io/Romm-emudecky/user-guide/getting-started/).
+A green workflow means the plugin was built and packaged successfully; it does not replace testing on the target device.
 
 ## Quick start
 
@@ -89,8 +88,8 @@ Build from source, run the tests, and read the architecture reference on the doc
 
 This plugin stands on the shoulders of some great projects:
 
-- [danielcopper/decky-romm-sync](https://github.com/danielcopper/decky-romm-sync) — the upstream project this is forked
-  from. Its RetroDECK integration was the foundation; this fork replaces the host layer with EmuDeck.
+- [melikootje/Romm-emudecky](https://github.com/melikootje/Romm-emudecky) — the direct upstream fork and EmuDeck codebase.
+- [danielcopper/decky-romm-sync](https://github.com/danielcopper/decky-romm-sync) — the original RomM Sync project and foundation for the integration.
 - [RomM](https://github.com/rommapp/romm) — the self-hosted ROM manager at the heart of this plugin. RomM provides the
   library, metadata, cover art, and save file storage that makes the entire sync experience possible
 - [EmuDeck](https://www.emudeck.com/) — the all-in-one emulation solution for Steam Deck that bundles ES-DE, RetroArch,
