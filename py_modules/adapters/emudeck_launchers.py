@@ -109,12 +109,19 @@ class EmuDeckLauncherAdapter:
             or os.path.basename(launcher_script) != launcher_script
         ):
             return False
-        # Open the launcher directory first and resolve the validated basename
-        # relative to its descriptor. O_NOFOLLOW rejects launcher symlinks,
-        # avoiding a path validation / open race on the final component.
+        # Resolve in-tree aliases, while rejecting links escaping the trusted
+        # launcher directory. The resolved relative name is then opened
+        # against a directory descriptor rather than an arbitrary absolute path.
+        root = os.path.realpath(self._paths.launchers_path())
+        target = os.path.realpath(os.path.join(root, launcher_script))
+        if os.path.commonpath((root, target)) != root:
+            return False
+        relative_target = os.path.relpath(target, root)
+        if relative_target in (".", "..") or relative_target.startswith(".." + os.sep):
+            return False
         try:
             directory_fd = os.open(
-                self._paths.launchers_path(),
+                root,
                 os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0),
             )
         except OSError:
@@ -123,7 +130,7 @@ class EmuDeckLauncherAdapter:
             flags = getattr(os, "O_PATH", os.O_RDONLY) | getattr(os, "O_CLOEXEC", 0)
             flags |= getattr(os, "O_NOFOLLOW", 0)
             try:
-                fd = os.open(launcher_script, flags, dir_fd=directory_fd)
+                fd = os.open(relative_target, flags, dir_fd=directory_fd)
             except OSError:
                 return False
             try:
@@ -131,7 +138,7 @@ class EmuDeckLauncherAdapter:
                 return (
                     stat.S_ISREG(info.st_mode)
                     and bool(info.st_mode & 0o111)
-                    and os.access(launcher_script, os.X_OK, dir_fd=directory_fd, follow_symlinks=False)
+                    and os.access(relative_target, os.X_OK, dir_fd=directory_fd, follow_symlinks=False)
                 )
             finally:
                 os.close(fd)
