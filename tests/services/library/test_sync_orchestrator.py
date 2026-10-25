@@ -203,7 +203,9 @@ class TestShortcutDataFormat:
         result = build_shortcuts_data([{"id": 1, "name": "Game"}], decky.DECKY_PLUGIN_DIR, {}, {})
         exe = result[0]["exe"]
         assert exe.endswith("/bin/rom-launcher"), f"Exe path should end with /bin/rom-launcher, got: {exe}"
-        assert "decky-romm-sync" in exe, f"Exe path should contain plugin name, got: {exe}"
+        assert os.path.dirname(os.path.dirname(exe)) == os.path.abspath(decky.DECKY_PLUGIN_DIR), (
+            f"Exe path should be inside the configured plugin directory, got: {exe}"
+        )
 
     def test_installed_rom_gets_launch_command(self, plugin):
         """An installed ROM with a resolved invocation bakes the full launch command."""
