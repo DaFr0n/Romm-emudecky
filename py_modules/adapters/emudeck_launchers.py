@@ -102,7 +102,11 @@ class EmuDeckLauncherAdapter:
     def _launcher_exists(self, launcher_script: str) -> bool:
         # Launcher mappings are basenames, never arbitrary paths. Reject
         # traversal and symlink escapes before checking executability.
-        if not launcher_script or os.path.basename(launcher_script) != launcher_script:
+        if (
+            not launcher_script
+            or launcher_script in (".", "..")
+            or os.path.basename(launcher_script) != launcher_script
+        ):
             return False
         root = os.path.realpath(self._paths.launchers_path())
         path = os.path.realpath(self._launcher_full_path(launcher_script))
