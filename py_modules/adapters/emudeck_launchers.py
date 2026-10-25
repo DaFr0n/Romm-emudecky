@@ -117,7 +117,7 @@ class EmuDeckLauncherAdapter:
         # arbitrary filename. O_NOFOLLOW rejects a last-moment symlink swap.
         # The descriptor is always closed, including on permission failures.
         try:
-            flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+            flags = getattr(os, "O_PATH", os.O_RDONLY) | getattr(os, "O_CLOEXEC", 0)
             flags |= getattr(os, "O_NOFOLLOW", 0)
             fd = os.open(path, flags)
             try:
