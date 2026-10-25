@@ -1,0 +1,67 @@
+name: Build EmuDeck Plugin ZIP
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - emudeck-port
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download Decky CLI
+        run: |
+          mkdir -p /tmp/decky-cli
+          curl --fail --location \
+            -o /tmp/decky-cli/decky \
+            https://github.com/SteamDeckHomebrew/cli/releases/download/0.0.8/decky-linux-x86_64
+          echo "6777e356508c1ce887f8e61b0fa4954bb48b32e6d97341eef68ea4e0d6ead9a0  /tmp/decky-cli/decky" | sha256sum -c -
+          chmod +x /tmp/decky-cli/decky
+          echo "/tmp/decky-cli" >> "$GITHUB_PATH"
+
+      - name: Build Decky ZIP
+        run: |
+          sudo "$(which decky)" plugin build \
+            -o /tmp/output \
+            -s directory "$GITHUB_WORKSPACE"
+
+      - name: Verify package
+        run: |
+          ZIP=$(find /tmp/output -maxdepth 1 -name '*.zip' -print -quit)
+          test -n "$ZIP"
+          for required in \
+            main.py plugin.json package.json \
+            dist/index.js py_modules/bootstrap.py \
+            bin/rom-launcher bios_registry.json; do
+            unzip -l "$ZIP" | grep -qF "$required" || {
+              echo "Missing required file: $required"
+              exit 1
+            }
+          done
+
+      - name: Upload installable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: RomM-EmuDeck-Decky-Plugin
+          path: /tmp/output/*.zip
+          if-no-files-found: error
