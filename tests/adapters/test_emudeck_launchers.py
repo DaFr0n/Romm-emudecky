@@ -238,6 +238,18 @@ class TestLauncherPathSecurity:
         assert result.status == RESOLUTION_LAUNCHER_MISSING
         assert result.launch_options == ""
 
+    def test_empty_launcher_name_is_rejected(self, tmp_path):
+        launchers = _make_launcher(tmp_path, "safe.sh")
+        adapter = EmuDeckLauncherAdapter(
+            paths=_FakePaths(launchers=launchers),
+            retroarch_cores_dir="/x/c",
+            system_launcher_map={"ps3": ""},
+            logger=logging.getLogger("test"),
+        )
+        result = adapter.resolve_for({}, EmulatorInvocation.standalone("%EMULATOR_RPCS3% %ROM%"), "ps3")
+        assert result.status == RESOLUTION_LAUNCHER_MISSING
+        assert result.launch_options == ""
+
     def test_symlink_escape_is_rejected(self, tmp_path):
         launchers = _make_launcher(tmp_path, "safe.sh")
         outside = tmp_path / "outside.sh"
