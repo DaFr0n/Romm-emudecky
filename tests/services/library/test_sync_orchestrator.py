@@ -212,7 +212,9 @@ class TestShortcutDataFormat:
         from domain.shortcut_data import build_shortcuts_data
 
         invocation = "flatpak run net.retrodeck.retrodeck"
-        result = build_shortcuts_data([{"id": 42, "name": "Game"}], "/plugin", {42: "/roms/n64/game.z64"}, {42: invocation})
+        result = build_shortcuts_data(
+            [{"id": 42, "name": "Game"}], "/plugin", {42: "/roms/n64/game.z64"}, {42: invocation}
+        )
         assert result[0]["launch_options"] == 'flatpak run net.retrodeck.retrodeck "/roms/n64/game.z64"'
 
     def test_start_dir_is_parent_of_exe(self, plugin):
