@@ -83,10 +83,10 @@ jobs:
                   if item.is_dir():
                       continue
                   if name.startswith("/") or ".." in pathlib.PurePosixPath(name).parts:
-                      issues.append("Unsafe archive path")
+                      issues.append(f"Unsafe archive path: {name}")
                       continue
                   if forbidden_names.search(name):
-                      issues.append("Sensitive filename present")
+                      issues.append(f"Sensitive filename present: {name}")
                   if item.file_size > 10_000_000:
                       continue
                   if pathlib.PurePosixPath(name).suffix.lower() in {
@@ -96,8 +96,9 @@ jobs:
                   }:
                       continue
                   data = archive.read(item)
-                  if any(pattern.search(data) for pattern in secret_patterns):
-                      issues.append("Possible embedded credential in packaged content")
+                  for index, pattern in enumerate(secret_patterns, start=1):
+                      if pattern.search(data):
+                          issues.append(f"Possible embedded credential: {name} (rule {index})")
           if issues:
               for issue in sorted(set(issues)):
                   print("::error::" + issue)
