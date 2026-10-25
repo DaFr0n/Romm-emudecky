@@ -1638,7 +1638,7 @@ describe("SettingsPage", () => {
         await Promise.resolve();
       });
       expect(vi.mocked(backend.dismissSaveSortMigration)).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(clearSaveSortMigration)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(clearSaveSortMigration)).not.toHaveBeenCalled();
     });
   });
 
