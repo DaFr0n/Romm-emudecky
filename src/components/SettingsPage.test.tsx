@@ -1637,7 +1637,8 @@ describe("SettingsPage", () => {
         capturedMigration[capturedMigration.length - 1]?.onDismiss();
         await Promise.resolve();
       });
-      // No assertion beyond "did not throw" — the catch block is `/* ignore */`.
+      expect(vi.mocked(backend.dismissSaveSortMigration)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(clearSaveSortMigration)).not.toHaveBeenCalled();
     });
   });
 

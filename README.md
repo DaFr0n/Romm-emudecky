@@ -1,7 +1,8 @@
 # Romm-emudecky
 
-> **Security changes & AI disclosure:** [Read the summary of security hardening, validation, and AI-assisted development (PR #2)](https://github.com/DaFr0n/Romm-emudecky/pull/2).
-
+> **Security changes & AI disclosure:**
+> [Read the summary of security hardening, validation, and AI-assisted development (PR #2)](https://github.com/DaFr0n/Romm-emudecky/pull/2).
+>
 > **Fork** of [danielcopper/decky-romm-sync](https://github.com/danielcopper/decky-romm-sync) — ported from RetroDECK to
 > EmuDeck.
 
