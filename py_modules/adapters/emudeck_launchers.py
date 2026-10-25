@@ -24,6 +24,7 @@ The pure launch-string construction lives in
 from __future__ import annotations
 
 import os
+import stat
 from typing import TYPE_CHECKING, Any, Protocol
 
 from domain.emudeck_launch import (
@@ -112,7 +113,20 @@ class EmuDeckLauncherAdapter:
         path = os.path.realpath(self._launcher_full_path(launcher_script))
         if os.path.commonpath((root, path)) != root:
             return False
-        return os.path.isfile(path) and os.access(path, os.X_OK)
+        # Open the validated target instead of reporting metadata about an
+        # arbitrary filename. O_NOFOLLOW rejects a last-moment symlink swap.
+        # The descriptor is always closed, including on permission failures.
+        try:
+            flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+            flags |= getattr(os, "O_NOFOLLOW", 0)
+            fd = os.open(path, flags)
+            try:
+                info = os.fstat(fd)
+                return stat.S_ISREG(info.st_mode) and bool(info.st_mode & 0o111) and os.access(path, os.X_OK)
+            finally:
+                os.close(fd)
+        except OSError:
+            return False
 
     def resolve_for(
         self,
