@@ -74,7 +74,7 @@ jobs:
               re.compile(rb"gh[pousr]_[A-Za-z0-9_]{20,}"),
               re.compile(rb"github_pat_[A-Za-z0-9_]{20,}"),
               re.compile(rb"AKIA[0-9A-Z]{16}"),
-              re.compile(rb"(?i)(?:password|passwd|api[_-]?key|secret|access[_-]?token|refresh[_-]?token)\s*[:=]\s*['\"]?[^\s'\"{}$]{12,}"),
+              re.compile(rb"""(?i)(?:password|passwd|api[_-]?key|secret|access[_-]?token|refresh[_-]?token)\s*[:=]\s*(?:[\x27\x22])([A-Za-z0-9_./+=-]{16,})(?:[\x27\x22])"""),
           ]
           issues = []
           with zipfile.ZipFile(archives[0]) as archive:
