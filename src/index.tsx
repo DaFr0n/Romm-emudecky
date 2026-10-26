@@ -1,3 +1,4 @@
+import { recordUnsyncedRom, removeUnsyncedRomFiles } from "./utils/autoRemoveUnsynced";
 import { downloadSyncedDefaults } from "./utils/autoDownloadSync";
 import { definePlugin, addEventListener, removeEventListener, toaster } from "@decky/api";
 import { useState, useRef, useEffect, FC, type ReactNode } from "react";
@@ -298,7 +299,12 @@ export default definePlugin(() => {
         ...Object.values(data.romm_collection_app_ids ?? {}).flat(),
       ]),
     ];
-    detach(downloadSyncedDefaults(syncedAppIds, data.cancelled ?? false));
+    detach(
+      (async () => {
+        await removeUnsyncedRomFiles(data.cancelled ?? false);
+        await downloadSyncedDefaults(syncedAppIds, data.cancelled ?? false);
+      })(),
+    );
 
     // Report the TRUE delta, not the total processed set. The library applies
     // whole platforms, so total_games is not a real delta — the exact, honest
@@ -462,8 +468,9 @@ export default definePlugin(() => {
   // race the backend unbind and find nothing, orphaning the shortcut.
   const syncStaleListener = addEventListener<[SyncStaleData]>("sync_stale", (data: SyncStaleData) => {
     if (!Array.isArray(data.remove) || data.remove.length === 0) return;
-    for (const { app_id } of data.remove) {
+    for (const { app_id, rom_id } of data.remove) {
       if (app_id) {
+        recordUnsyncedRom(rom_id);
         removeShortcut(app_id);
         // Record the removal as a real "removed" delta. The store dedups across
         // the per-unit sync_stale emits so a shortcut removed once is counted once.
