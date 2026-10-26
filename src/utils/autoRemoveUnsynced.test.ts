@@ -14,7 +14,9 @@ describe("guarded ROM cleanup", () => {
     setAutoRemoveUnsyncedEnabled(false);
     vi.mocked(backend.getAppIdRomIdMap).mockReset().mockResolvedValue({});
     vi.mocked(backend.getDownloadQueue).mockReset().mockResolvedValue({ downloads: [] });
-    vi.mocked(backend.getInstalledRom).mockReset().mockResolvedValue({ file_path: "/roms/game.zip" } as never);
+    vi.mocked(backend.getInstalledRom)
+      .mockReset()
+      .mockResolvedValue({ file_path: "/roms/game.zip" } as never);
     vi.mocked(backend.removeRom).mockReset().mockResolvedValue({ success: true, message: "removed" });
   });
 

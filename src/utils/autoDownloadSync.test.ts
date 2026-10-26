@@ -94,9 +94,7 @@ describe("auto-download default ROMs", () => {
     expect(backend.startDownload).not.toHaveBeenCalled();
   });
 
-  it.each([{ is_default: false }, { synced: false }, { active: false }])(
-    "skips a version missing required default flags: %j",
-    async (changes) => {
+  it.each([{ is_default: false }, { synced: false }, { active: false }])("skips a version missing required default flags: %j", async (changes) => {
       vi.mocked(backend.getVersionList).mockResolvedValue({
         multi_version: true,
         versions: [version(10, changes)],
@@ -105,8 +103,7 @@ describe("auto-download default ROMs", () => {
       armAutoDownloadSync();
       await downloadSyncedDefaults([100], false);
       expect(backend.startDownload).not.toHaveBeenCalled();
-    },
-  );
+  });
 
   it("skips partial server version lookups", async () => {
     vi.mocked(backend.getVersionList).mockResolvedValue({

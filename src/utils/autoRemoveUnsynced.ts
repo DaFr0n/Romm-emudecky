@@ -45,7 +45,8 @@ export async function removeUnsyncedRomFiles(cancelled: boolean): Promise<void> 
         queue.downloads.some(
           (item) => item.rom_id === romId && ["queued", "downloading", "extracting", "paused"].includes(item.status),
         )
-      ) continue;
+      )
+        continue;
       if (!(await getInstalledRom(romId))) continue;
       const result = await removeRom(romId);
       if (!result.success) logError(`Auto-remove: ROM ${romId}: ${result.message}`);
