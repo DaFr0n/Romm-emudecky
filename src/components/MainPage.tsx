@@ -1,4 +1,10 @@
 import {
+  armAutoRemoveUnsynced,
+  disarmAutoRemoveUnsynced,
+  getAutoRemoveUnsyncedEnabled,
+  setAutoRemoveUnsyncedEnabled,
+} from "../utils/autoRemoveUnsynced";
+import {
   getAutoDownloadEnabled,
   setAutoDownloadEnabled,
   armAutoDownloadSync,
@@ -217,6 +223,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
   const [preview, setPreview] = useState<SyncPreview | null>(null);
   const [skipPreview, setSkipPreview] = useState(false);
   const [autoDownload, setAutoDownload] = useState(getAutoDownloadEnabled);
+  const [autoRemoveUnsynced, setAutoRemoveUnsynced] = useState(getAutoRemoveUnsyncedEnabled);
   const [loading, setLoading] = useState(false);
   const [retroarchWarning, setRetroarchWarning] = useState<{ warning: boolean; current?: string } | null>(null);
   const [retrodeckBanner, setRetrodeckBanner] = useState<RetroDeckBanner | null>(null);
@@ -378,6 +385,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
   // store mirrors reality — the optimistic running:true must not linger.
   const abortOptimisticSync = (msg: string) => {
     disarmAutoDownloadSync();
+    disarmAutoRemoveUnsynced();
     setStatus(msg);
     setSyncing(false);
     setLoading(false);
@@ -387,6 +395,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
 
   const handleSync = async () => {
     armAutoDownloadSync();
+    armAutoRemoveUnsynced();
     // Clear any stale cancel flag from a prior run BEFORE this sync starts, so a
     // fresh sync never begins pre-cancelled (#1198). Run identity for a Cancel
     // click comes from the backend-fed sync_progress store now (#1202).
@@ -445,6 +454,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
 
   const handleApply = async () => {
     armAutoDownloadSync();
+    armAutoRemoveUnsynced();
     if (!preview) return;
     const previewId = preview.preview_id;
     // Clear any stale cancel flag before the apply run starts (#1198). A Cancel
@@ -473,6 +483,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
     setStatus("");
     try {
       disarmAutoDownloadSync();
+    disarmAutoRemoveUnsynced();
       await syncCancelPreview();
     } catch {
       // ignore
@@ -500,6 +511,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
     // terminal sync_progress stage (the store subscription) to re-arm.
     setCancelling(true);
     disarmAutoDownloadSync();
+    disarmAutoRemoveUnsynced();
     requestSyncCancel();
     try {
       // Scope the cancel to the active run via the backend-fed run id; "" in the
@@ -681,6 +693,17 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
             onChange={(value) => {
               setAutoDownload(value);
               setAutoDownloadEnabled(value);
+            }}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ToggleField
+            label="Remove downloaded ROMs when unsynced"
+            description="After a completed sync, remove installed ROM files for removed shortcuts. Saves and BIOS remain. Off by default."
+            checked={autoRemoveUnsynced}
+            onChange={(value) => {
+              setAutoRemoveUnsynced(value);
+              setAutoRemoveUnsyncedEnabled(value);
             }}
           />
         </PanelSectionRow>
