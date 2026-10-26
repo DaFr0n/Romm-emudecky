@@ -1,6 +1,6 @@
 # EmuRomm Sync
 
-> **Fork changes and AI assistance:** This fork adapts RomM Sync for EmuDeck. The merged work includes a launcher-path CI test correction ([PR #1](https://github.com/DaFr0n/Romm-emudecky/pull/1)), security hardening for BIOS registry reads, launcher paths and release downloads ([PR #2](https://github.com/DaFr0n/Romm-emudecky/pull/2)), and a Sonar test assertion fix ([PR #3](https://github.com/DaFr0n/Romm-emudecky/pull/3)). The experimental filesystem-probe changes in [PR #4](https://github.com/DaFr0n/Romm-emudecky/pull/4) were **not merged**. Four pre-existing SonarCloud filesystem-oracle findings remain under review.
+> **Fork changes and AI assistance:** This fork adapts RomM Sync for EmuDeck. The merged work includes a launcher-path CI test correction ([PR #1](https://github.com/DaFr0n/Romm-emudecky/pull/1)), security hardening for BIOS registry reads, launcher paths and release downloads ([PR #2](https://github.com/DaFr0n/Romm-emudecky/pull/2)) and a Sonar test assertion fix ([PR #3](https://github.com/DaFr0n/Romm-emudecky/pull/3)). Four pre-existing SonarCloud filesystem-oracle findings remain under review.
 >
 > **AI disclosure:** OpenAI ChatGPT assisted with reviewing findings, proposing and editing changes, tests, CI/build troubleshooting, and documentation. The maintainer tested the installable Decky build and reported the changes working on a Legion Go S running SteamOS. AI assistance and a successful build do not guarantee that all issues are resolved.
 >
@@ -41,7 +41,7 @@ saves in sync across devices through your RomM server.
 
 - **Pre-release test build:** Auto-download has been tested successfully by the maintainer when using Force Full Sync. The follow-up change to support existing shortcuts with ordinary incremental sync and the new display name **EmuRomm Sync** still need on-device verification before the first release.
 - **Tested on Legion Go S (SteamOS):** the Decky plugin ZIP installs successfully, and the fork's merged changes have been tested by the maintainer.
-- **Development branch:** [`emudeck-port`](https://github.com/DaFr0n/Romm-emudecky/tree/emudeck-port). The working changes from PRs #1–#3 are merged; the unsuccessful filesystem-probe experiment in PR #4 was not merged.
+- **Development branch:** [`emudeck-port`](https://github.com/DaFr0n/Romm-emudecky/tree/emudeck-port). The working changes from PRs #1–#3 are merged.
 - **Security:** launcher-path containment checks and other hardening are included. Four inherited SonarCloud filesystem-oracle findings remain under review; passing a build does not establish that they are resolved.
 - **Compatibility:** functionality can depend on installed EmuDeck launcher scripts and emulator configuration. Not every emulator or save-sync scenario has been verified.
 
