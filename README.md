@@ -16,8 +16,8 @@
   being verified before the first release.
 
 **AI disclosure:** OpenAI ChatGPT assisted with reviewing findings, proposing and editing changes, tests, CI/build
-troubleshooting, and documentation. The maintainer tested the installable Decky build and reported the changes working on
-a Legion Go S running SteamOS. AI assistance and a successful build do not guarantee that all issues are resolved.
+troubleshooting, and documentation. The maintainer tested the installable Decky build and reported the changes working
+on a Legion Go S running SteamOS. AI assistance and a successful build do not guarantee that all issues are resolved.
 
 **EmuDeck fork** of [melikootje/Romm-emudecky](https://github.com/melikootje/Romm-emudecky), originally based on
 [danielcopper/decky-romm-sync](https://github.com/danielcopper/decky-romm-sync). This branch targets EmuDeck rather than
@@ -85,8 +85,8 @@ saves in sync across devices through your RomM server.
 This fork currently distributes **EmuRomm Sync** test builds through **GitHub Actions artifacts**, not GitHub Releases
 or the Decky Store.
 
-1. Open the [Build EmuDeck Plugin ZIP
-   workflow](https://github.com/DaFr0n/Romm-emudecky/actions/workflows/build-emudeck.yml).
+1. Open the
+   [Build EmuDeck Plugin ZIP workflow](https://github.com/DaFr0n/Romm-emudecky/actions/workflows/build-emudeck.yml).
 2. Open the latest **successful** run for `emudeck-port`.
 3. Under **Artifacts**, download `RomM-EmuDeck-Decky-Plugin` (GitHub login may be required).
 4. **Extract the downloaded artifact ZIP**. It contains the actual Decky-installable plugin ZIP; do not submit the outer
