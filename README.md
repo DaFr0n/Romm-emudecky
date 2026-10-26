@@ -1,6 +1,14 @@
 # EmuRomm Sync
 
-> **Fork changes and AI assistance:** This fork adapts RomM Sync for EmuDeck. The merged work includes a launcher-path CI test correction ([PR #1](https://github.com/DaFr0n/Romm-emudecky/pull/1)), security hardening for BIOS registry reads, launcher paths and release downloads ([PR #2](https://github.com/DaFr0n/Romm-emudecky/pull/2)) and a Sonar test assertion fix ([PR #3](https://github.com/DaFr0n/Romm-emudecky/pull/3)). Four pre-existing SonarCloud filesystem-oracle findings remain under review.
+> **What's improved in this EmuDeck fork:**
+>
+> - **EmuDeck support** — Updated the plugin to work with EmuDeck game launchers and paths on SteamOS.
+> - **Automatic game downloads** — Added an optional toggle to download missing games when syncing your RomM library, including games with existing Steam shortcuts.
+> - **Smart version selection** — Automatically downloads only the synced **Default** game version and skips alternatives marked **Not Synced**.
+> - **Safe download handling** — Skips games already installed and uses the existing download queue.
+> - **Steam library integration** — Syncs games as Steam shortcuts with artwork and supports library previews and incremental syncing.
+> - **Reliability and security** — Improved launcher-path handling, BIOS registry safety, download security, and automated build checks.
+> - **Handheld testing** — Tested on a Legion Go S running SteamOS; the latest incremental auto-download improvements are being verified before the first release.
 >
 > **AI disclosure:** OpenAI ChatGPT assisted with reviewing findings, proposing and editing changes, tests, CI/build troubleshooting, and documentation. The maintainer tested the installable Decky build and reported the changes working on a Legion Go S running SteamOS. AI assistance and a successful build do not guarantee that all issues are resolved.
 >
