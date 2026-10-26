@@ -1,5 +1,5 @@
 {
-  "name": "RomM Sync",
+  "name": "EmuRomm Sync",
   "version": "0.26.1",
   "author": "melikootje",
   "flags": [],
@@ -11,7 +11,7 @@
       "emudeck",
       "emulation"
     ],
-    "description": "Sync your self-hosted RomM library with Steam on EmuDeck/SteamOS. Includes ROM downloads, Steam shortcuts and artwork, BIOS management, and save syncing. Tested on Legion Go S.",
+    "description": "Sync RomM favourites to Steam through EmuDeck, with optional automatic downloads of default ROM versions, artwork, BIOS management, and save syncing. Tested on Legion Go S.",
     "image": "https://raw.githubusercontent.com/danielcopper/decky-romm-sync/main/assets/store_image.png"
   }
 }
