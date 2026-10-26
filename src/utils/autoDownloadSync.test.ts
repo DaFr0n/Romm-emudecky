@@ -94,12 +94,32 @@ describe("auto-download default ROMs", () => {
     expect(backend.startDownload).not.toHaveBeenCalled();
   });
 
-  const invalidDefaultFlags = [{ is_default: false }, { synced: false }, { active: false }];
-
-  it.each(invalidDefaultFlags)("skips bad flags: %j", async (changes) => {
+  it("skips a non-default version", async () => {
     vi.mocked(backend.getVersionList).mockResolvedValue({
       multi_version: true,
-      versions: [version(10, changes)],
+      versions: [version(10, { is_default: false })],
+    });
+    setAutoDownloadEnabled(true);
+    armAutoDownloadSync();
+    await downloadSyncedDefaults([100], false);
+    expect(backend.startDownload).not.toHaveBeenCalled();
+  });
+
+  it("skips a unsynced version", async () => {
+    vi.mocked(backend.getVersionList).mockResolvedValue({
+      multi_version: true,
+      versions: [version(10, { synced: false })],
+    });
+    setAutoDownloadEnabled(true);
+    armAutoDownloadSync();
+    await downloadSyncedDefaults([100], false);
+    expect(backend.startDownload).not.toHaveBeenCalled();
+  });
+
+  it("skips a inactive version", async () => {
+    vi.mocked(backend.getVersionList).mockResolvedValue({
+      multi_version: true,
+      versions: [version(10, { active: false })],
     });
     setAutoDownloadEnabled(true);
     armAutoDownloadSync();
