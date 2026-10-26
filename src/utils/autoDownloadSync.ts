@@ -5,10 +5,18 @@ let enabled = false;
 let pending = false;
 let running = false;
 
-export function getAutoDownloadEnabled(): boolean { return enabled; }
-export function setAutoDownloadEnabled(value: boolean): void { enabled = value; }
-export function armAutoDownloadSync(): void { pending = enabled; }
-export function disarmAutoDownloadSync(): void { pending = false; }
+export function getAutoDownloadEnabled(): boolean {
+  return enabled;
+}
+export function setAutoDownloadEnabled(value: boolean): void {
+  enabled = value;
+}
+export function armAutoDownloadSync(): void {
+  pending = enabled;
+}
+export function disarmAutoDownloadSync(): void {
+  pending = false;
+}
 
 /** Include all currently bound shortcuts, even when incremental sync skipped unchanged platforms. */
 export async function downloadSyncedDefaults(appIds: number[], cancelled: boolean): Promise<void> {
