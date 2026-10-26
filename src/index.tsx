@@ -292,7 +292,12 @@ export default definePlugin(() => {
   }) => {
     logInfo(`sync_complete received: ${data.total_games} games, cancelled=${data.cancelled ?? false}`);
 
-    const syncedAppIds = [...new Set([...Object.values(data.platform_app_ids).flat(), ...Object.values(data.romm_collection_app_ids ?? {}).flat()])];
+    const syncedAppIds = [
+      ...new Set([
+        ...Object.values(data.platform_app_ids).flat(),
+        ...Object.values(data.romm_collection_app_ids ?? {}).flat(),
+      ]),
+    ];
     detach(downloadSyncedDefaults(syncedAppIds, data.cancelled ?? false));
 
     // Report the TRUE delta, not the total processed set. The library applies
