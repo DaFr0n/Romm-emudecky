@@ -1,3 +1,4 @@
+import { downloadSyncedDefaults } from "./utils/autoDownloadSync";
 import { definePlugin, addEventListener, removeEventListener, toaster } from "@decky/api";
 import { useState, useRef, useEffect, FC, type ReactNode } from "react";
 import { FaGamepad } from "react-icons/fa";
@@ -290,6 +291,9 @@ export default definePlugin(() => {
     cancelled?: boolean;
   }) => {
     logInfo(`sync_complete received: ${data.total_games} games, cancelled=${data.cancelled ?? false}`);
+
+    const syncedAppIds = [...new Set([...Object.values(data.platform_app_ids).flat(), ...Object.values(data.romm_collection_app_ids ?? {}).flat()])];
+    detach(downloadSyncedDefaults(syncedAppIds, data.cancelled ?? false));
 
     // Report the TRUE delta, not the total processed set. The library applies
     // whole platforms, so total_games is not a real delta — the exact, honest
