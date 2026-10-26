@@ -1,4 +1,9 @@
-import { getAutoDownloadEnabled, setAutoDownloadEnabled, armAutoDownloadSync, disarmAutoDownloadSync } from "../utils/autoDownloadSync";
+import {
+  getAutoDownloadEnabled,
+  setAutoDownloadEnabled,
+  armAutoDownloadSync,
+  disarmAutoDownloadSync,
+} from "../utils/autoDownloadSync";
 import { useState, useEffect, useRef, FC, ReactNode } from "react";
 import {
   PanelSection,
@@ -673,7 +678,10 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
             label="Auto-download synced games"
             description="After sync, queue only the default version for each shortcut; skip existing installs."
             checked={autoDownload}
-            onChange={(value) => { setAutoDownload(value); setAutoDownloadEnabled(value); }}
+            onChange={(value) => {
+              setAutoDownload(value);
+              setAutoDownloadEnabled(value);
+            }}
           />
         </PanelSectionRow>
         {stats?.last_sync && (
