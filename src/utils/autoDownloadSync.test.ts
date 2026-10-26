@@ -29,10 +29,12 @@ describe("auto-download default ROMs", () => {
     setAutoDownloadEnabled(false);
     disarmAutoDownloadSync();
     vi.mocked(backend.getAppIdRomIdMap).mockReset().mockResolvedValue({ "100": 10 });
-    vi.mocked(backend.getVersionList).mockReset().mockResolvedValue({
-      multi_version: false,
-      versions: [version(10)],
-    });
+    vi.mocked(backend.getVersionList)
+      .mockReset()
+      .mockResolvedValue({
+        multi_version: false,
+        versions: [version(10)],
+      });
     vi.mocked(backend.getInstalledRom).mockReset().mockResolvedValue(null);
     vi.mocked(backend.startDownload).mockReset().mockResolvedValue({ success: true, message: "queued" });
     vi.spyOn(backend, "logError").mockImplementation(() => undefined);
