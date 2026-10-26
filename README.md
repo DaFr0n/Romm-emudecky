@@ -1,27 +1,27 @@
 # EmuRomm Sync
 
-> **What's improved in this EmuDeck fork:**
->
-> - **EmuDeck support** — Updated the plugin to work with EmuDeck game launchers and paths on SteamOS.
+## What's improved in this EmuDeck fork
+
+- **EmuDeck support** — Updated the plugin to work with EmuDeck game launchers and paths on SteamOS.
 - **Automatic game downloads** — Added an optional toggle to download missing games when syncing your RomM library,
->   including games with existing Steam shortcuts.
-- **Smart version selection** — Automatically downloads only the synced **Default** game version and skips
->   alternatives marked **Not Synced**.
-> - **Safe download handling** — Skips games already installed and uses the existing download queue.
+  including games with existing Steam shortcuts.
+- **Smart version selection** — Automatically downloads only the synced **Default** game version and skips alternatives
+  marked **Not Synced**.
+- **Safe download handling** — Skips games already installed and uses the existing download queue.
 - **Steam library integration** — Syncs games as Steam shortcuts with artwork and supports library previews and
->   incremental syncing.
-- **Reliability and security** — Improved launcher-path handling, BIOS registry safety, download security, and
->   automated build checks.
-- **Handheld testing** — Tested on a Legion Go S running SteamOS; the latest incremental auto-download improvements
->   are being verified before the first release.
->
+  incremental syncing.
+- **Reliability and security** — Improved launcher-path handling, BIOS registry safety, download security, and automated
+  build checks.
+- **Handheld testing** — Tested on a Legion Go S running SteamOS; the latest incremental auto-download improvements are
+  being verified before the first release.
+
 **AI disclosure:** OpenAI ChatGPT assisted with reviewing findings, proposing and editing changes, tests, CI/build
-> troubleshooting, and documentation. The maintainer tested the installable Decky build and reported the changes working
-> on a Legion Go S running SteamOS. AI assistance and a successful build do not guarantee that all issues are resolved.
->
-> **EmuDeck fork** of [melikootje/Romm-emudecky](https://github.com/melikootje/Romm-emudecky), originally based on
+troubleshooting, and documentation. The maintainer tested the installable Decky build and reported the changes working on
+a Legion Go S running SteamOS. AI assistance and a successful build do not guarantee that all issues are resolved.
+
+**EmuDeck fork** of [melikootje/Romm-emudecky](https://github.com/melikootje/Romm-emudecky), originally based on
 [danielcopper/decky-romm-sync](https://github.com/danielcopper/decky-romm-sync). This branch targets EmuDeck rather than
-> RetroDECK.
+RetroDECK.
 
 A [Decky Loader](https://decky.xyz/) plugin that syncs your self-hosted [RomM](https://github.com/rommapp/romm) library
 into Steam as non-steam shortcuts. Games appear directly in your Steam library, launch through EmuDeck, and keep their
