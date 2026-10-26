@@ -10,7 +10,7 @@ export function setAutoDownloadEnabled(value: boolean): void { enabled = value; 
 export function armAutoDownloadSync(): void { pending = enabled; }
 export function disarmAutoDownloadSync(): void { pending = false; }
 
-/** Only consider shortcuts that the completed sync actually reported. */
+/** Include all currently bound shortcuts, even when incremental sync skipped unchanged platforms. */
 export async function downloadSyncedDefaults(appIds: number[], cancelled: boolean): Promise<void> {
   if (!pending) return;
   pending = false;
@@ -19,7 +19,8 @@ export async function downloadSyncedDefaults(appIds: number[], cancelled: boolea
   try {
     const bindings = await getAppIdRomIdMap();
     const seen = new Set<number>();
-    for (const appId of new Set(appIds)) {
+    const boundAppIds = Object.keys(bindings).map(Number).filter(Number.isSafeInteger);
+    for (const appId of new Set([...appIds, ...boundAppIds])) {
       const boundRomId = bindings[String(appId)];
       if (!boundRomId) continue;
       try {
