@@ -699,9 +699,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
         <PanelSectionRow>
           <ToggleField
             label="Remove downloaded ROMs when unsynced"
-            description={
-              "After a completed sync, remove installed ROM files for removed shortcuts. Saves and BIOS remain. Off by default."
-            }
+            description="After sync, remove downloaded ROM files for unsynced games. Saves and BIOS are kept."
             checked={autoRemoveUnsynced}
             onChange={(value) => {
               setAutoRemoveUnsynced(value);
