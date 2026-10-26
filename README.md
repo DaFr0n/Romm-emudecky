@@ -41,9 +41,9 @@ saves in sync across devices through your RomM server.
 - **Default-version selection** — When a game has multiple RomM versions, only the synced, active **Default** version is
   eligible for automatic download. **Not Synced** alternatives are ignored; already-installed versions are left
   untouched. Multi-disc files belonging to the selected ROM use the existing downloader.
-- **Optional removal of unsynced ROMs** — Enable **Remove downloaded ROMs when unsynced** to remove downloaded ROM
-  files for games removed during a successful library sync. Off by default; saves and BIOS are preserved. Cancelled
-  syncs, ROMs still linked to Steam shortcuts, and active download-queue items are skipped.
+- **Optional removal of unsynced ROMs** — Enable **Remove downloaded ROMs when unsynced** to remove downloaded ROM files
+  for games removed during a successful library sync. Off by default; saves and BIOS are preserved. Cancelled syncs,
+  ROMs still linked to Steam shortcuts, and active download-queue items are skipped.
 - **BIOS management** — Download firmware/BIOS files from RomM for systems that need them (PSX, Dreamcast, PS2, …)
 - **Game detail page** — Install status, BIOS status, and download/uninstall actions right on each game's Steam page
 - **Per-platform control** — Choose exactly which platforms get synced
@@ -86,8 +86,8 @@ saves in sync across devices through your RomM server.
 
 ### Test build from GitHub Actions
 
-**EmuRomm Sync** builds are available through GitHub Actions artifacts. GitHub Releases may also provide packaged
-builds once published; the fork is not currently listed in the Decky Store.
+**EmuRomm Sync** builds are available through GitHub Actions artifacts. GitHub Releases may also provide packaged builds
+once published; the fork is not currently listed in the Decky Store.
 
 1. Open the
    [Build EmuDeck Plugin ZIP workflow](https://github.com/DaFr0n/Romm-emudecky/actions/workflows/build-emudeck.yml).
