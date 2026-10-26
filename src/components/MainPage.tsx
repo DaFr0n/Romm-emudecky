@@ -483,7 +483,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
     setStatus("");
     try {
       disarmAutoDownloadSync();
-    disarmAutoRemoveUnsynced();
+      disarmAutoRemoveUnsynced();
       await syncCancelPreview();
     } catch {
       // ignore

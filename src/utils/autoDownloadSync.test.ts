@@ -95,14 +95,14 @@ describe("auto-download default ROMs", () => {
   });
 
   it.each([{ is_default: false }, { synced: false }, { active: false }])("skips bad flags: %j", async (changes) => {
-      vi.mocked(backend.getVersionList).mockResolvedValue({
-        multi_version: true,
-        versions: [version(10, changes)],
-      });
-      setAutoDownloadEnabled(true);
-      armAutoDownloadSync();
-      await downloadSyncedDefaults([100], false);
-      expect(backend.startDownload).not.toHaveBeenCalled();
+    vi.mocked(backend.getVersionList).mockResolvedValue({
+      multi_version: true,
+      versions: [version(10, changes)],
+    });
+    setAutoDownloadEnabled(true);
+    armAutoDownloadSync();
+    await downloadSyncedDefaults([100], false);
+    expect(backend.startDownload).not.toHaveBeenCalled();
   });
 
   it("skips partial server version lookups", async () => {
