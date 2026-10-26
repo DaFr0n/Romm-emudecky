@@ -616,7 +616,7 @@ export default definePlugin(() => {
   );
 
   return {
-    name: "RomM Sync",
+    name: "EmuRomm Sync",
     icon: <FaGamepad />,
     content: <QAMPanel />,
     alwaysRender: true,
