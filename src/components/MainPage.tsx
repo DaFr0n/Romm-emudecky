@@ -1,3 +1,4 @@
+import { getAutoDownloadEnabled, setAutoDownloadEnabled, armAutoDownloadSync, disarmAutoDownloadSync } from "../utils/autoDownloadSync";
 import { useState, useEffect, useRef, FC, ReactNode } from "react";
 import {
   PanelSection,
@@ -210,6 +211,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
   const [status, setStatus] = useState("");
   const [preview, setPreview] = useState<SyncPreview | null>(null);
   const [skipPreview, setSkipPreview] = useState(false);
+  const [autoDownload, setAutoDownload] = useState(getAutoDownloadEnabled);
   const [loading, setLoading] = useState(false);
   const [retroarchWarning, setRetroarchWarning] = useState<{ warning: boolean; current?: string } | null>(null);
   const [retrodeckBanner, setRetrodeckBanner] = useState<RetroDeckBanner | null>(null);
@@ -370,6 +372,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
   // front or threw). Reset both the local UI and the MODULE store so the
   // store mirrors reality — the optimistic running:true must not linger.
   const abortOptimisticSync = (msg: string) => {
+    disarmAutoDownloadSync();
     setStatus(msg);
     setSyncing(false);
     setLoading(false);
@@ -378,6 +381,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
   };
 
   const handleSync = async () => {
+    armAutoDownloadSync();
     // Clear any stale cancel flag from a prior run BEFORE this sync starts, so a
     // fresh sync never begins pre-cancelled (#1198). Run identity for a Cancel
     // click comes from the backend-fed sync_progress store now (#1202).
@@ -435,6 +439,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
   };
 
   const handleApply = async () => {
+    armAutoDownloadSync();
     if (!preview) return;
     const previewId = preview.preview_id;
     // Clear any stale cancel flag before the apply run starts (#1198). A Cancel
@@ -462,6 +467,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
     setPreview(null);
     setStatus("");
     try {
+      disarmAutoDownloadSync();
       await syncCancelPreview();
     } catch {
       // ignore
@@ -488,6 +494,7 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
     // "instant finish". Disarm into the "Cancelling…" state and wait for the
     // terminal sync_progress stage (the store subscription) to re-arm.
     setCancelling(true);
+    disarmAutoDownloadSync();
     requestSyncCancel();
     try {
       // Scope the cancel to the active run via the backend-fed run id; "" in the
@@ -659,6 +666,14 @@ export const MainPage: FC<MainPageProps> = ({ onNavigate }) => {
             description="Apply changes immediately without preview"
             checked={skipPreview}
             onChange={setSkipPreview}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ToggleField
+            label="Auto-download synced games"
+            description="After sync, queue only the default version for each shortcut; skip existing installs."
+            checked={autoDownload}
+            onChange={(value) => { setAutoDownload(value); setAutoDownloadEnabled(value); }}
           />
         </PanelSectionRow>
         {stats?.last_sync && (
