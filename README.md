@@ -8,6 +8,8 @@
 - **Smart version selection** — Automatically downloads only the synced **Default** game version and skips alternatives
   marked **Not Synced**.
 - **Safe download handling** — Skips games already installed and uses the existing download queue.
+- **Optional ROM cleanup** — Remove downloaded ROM files for games unsynced after a successful sync. Off by default;
+  saves and BIOS remain untouched, and cancelled syncs never trigger cleanup.
 - **Steam library integration** — Syncs games as Steam shortcuts with artwork and supports library previews and
   incremental syncing.
 - **Reliability and security** — Improved launcher-path handling, BIOS registry safety, download security, and automated
@@ -39,6 +41,9 @@ saves in sync across devices through your RomM server.
 - **Default-version selection** — When a game has multiple RomM versions, only the synced, active **Default** version is
   eligible for automatic download. **Not Synced** alternatives are ignored; already-installed versions are left
   untouched. Multi-disc files belonging to the selected ROM use the existing downloader.
+- **Optional removal of unsynced ROMs** — Enable **Remove downloaded ROMs when unsynced** to remove downloaded ROM
+  files for games removed during a successful library sync. Off by default; saves and BIOS are preserved. Cancelled
+  syncs, ROMs still linked to Steam shortcuts, and active download-queue items are skipped.
 - **BIOS management** — Download firmware/BIOS files from RomM for systems that need them (PSX, Dreamcast, PS2, …)
 - **Game detail page** — Install status, BIOS status, and download/uninstall actions right on each game's Steam page
 - **Per-platform control** — Choose exactly which platforms get synced
@@ -58,9 +63,8 @@ saves in sync across devices through your RomM server.
 
 ## Current status
 
-- **Pre-release test build:** Auto-download has been tested successfully by the maintainer when using Force Full Sync.
-  The follow-up change to support existing shortcuts with ordinary incremental sync and the new display name **EmuRomm
-  Sync** still need on-device verification before the first release.
+- **First release candidate:** Optional auto-download and opt-in ROM cleanup are included. CI, tests, formatting,
+  SonarCloud Quality Gate, and ZIP packaging pass. Verify cleanup on your own device before relying on it.
 - **Tested on Legion Go S (SteamOS):** the Decky plugin ZIP installs successfully, and the fork's merged changes have
   been tested by the maintainer.
 - **Development branch:** [`emudeck-port`](https://github.com/DaFr0n/Romm-emudecky/tree/emudeck-port). The working
@@ -82,8 +86,8 @@ saves in sync across devices through your RomM server.
 
 ### Test build from GitHub Actions
 
-This fork currently distributes **EmuRomm Sync** test builds through **GitHub Actions artifacts**, not GitHub Releases
-or the Decky Store.
+**EmuRomm Sync** builds are available through GitHub Actions artifacts. GitHub Releases may also provide packaged
+builds once published; the fork is not currently listed in the Decky Store.
 
 1. Open the
    [Build EmuDeck Plugin ZIP workflow](https://github.com/DaFr0n/Romm-emudecky/actions/workflows/build-emudeck.yml).
@@ -106,11 +110,19 @@ A green workflow means the plugin was built and packaged successfully; it does n
 2. In **Settings**, enter your RomM server URL and credentials, then hit **Test Connection**
 3. In **Platforms**, enable the platforms you want to sync
 4. Optionally enable **Auto-download synced games** before syncing; leave it off if you only want Steam shortcuts.
+   **Remove downloaded ROMs when unsynced** is a separate off-by-default toggle.
 5. Hit **Sync Library** — your ROMs appear as non-Steam shortcuts. With auto-download enabled, missing default ROMs are
    queued after a successful sync, even for shortcuts already present.
 6. **Skip Preview** applies changes immediately; otherwise review the preview and select **Apply Sync**. **Force Full
    Sync** clears the sync cache and re-fetches platform data; it should **not** be necessary just to auto-download games
    for existing shortcuts.
+
+### Optional removal of unsynced ROMs
+
+- The cleanup toggle is **off by default** and applies to the current plugin session. Enable it before syncing.
+- Cleanup runs only after a completed, non-cancelled sync and only for ROMs no longer linked to Steam shortcuts.
+- Active queued, downloading, extracting, or paused ROMs are skipped. Saves and BIOS are not removed by this feature.
+- Review sync changes before applying them, and keep backups of important ROMs and saves while testing.
 
 ### Automatic downloads: what to expect
 
